@@ -27,10 +27,14 @@ logs/
 *.swo
 Thumbs.db
 
-# Atlas data — selected final datasets will be committed separately when ready
+# Atlas data — generated output is gitignored; selected final datasets get
+# committed separately when ready. Source/input files under data/ are NOT
+# generated output and SHOULD be tracked.
 data/*.csv
 data/*.json
 data/*.jsonl
+data/atlas-failures.jsonl
 
-# Keep the data/ directory present via .gitkeep
+# Inputs + directory marker — must stay tracked
 !data/.gitkeep
+!data/source-prompts.jsonl

@@ -1,0 +1,10 @@
+{"prompt":"help me","vertical":"general","source":"synthetic","note":"deliberately vague — low-quality baseline"}
+{"prompt":"Write a concise, polite email declining a meeting invitation because you have a conflicting deadline. Include a sentence offering to reschedule.","vertical":"business","source":"synthetic","note":"well-specified business prompt"}
+{"prompt":"is this good","vertical":"crypto","source":"synthetic","note":"missing context — vague"}
+{"prompt":"Analyze the on-chain safety signals for token contract 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 on the Base chain. Report deployer wallet age, liquidity-lock status, and top-10 holder concentration, then give a SAFE/CAUTION/AVOID verdict with a one-sentence rationale.","vertical":"crypto","source":"synthetic","note":"well-specified crypto prompt"}
+{"prompt":"make me a tweet","vertical":"content","source":"synthetic","note":"vague content prompt"}
+{"prompt":"Write a single tweet (under 280 characters) announcing the release of an open-source Python library called 'pqs-sdk' for scoring LLM prompts. Target audience: AI developers. Tone: informative, not hype-y. Include one concrete benefit.","vertical":"content","source":"synthetic","note":"well-specified content prompt"}
+{"prompt":"fix this function","vertical":"software","source":"synthetic","note":"vague software prompt with no code"}
+{"prompt":"Review this Python function for potential issues. Return a bulleted list of concerns, each with a one-line explanation and a suggested fix.\n\ndef parse_user_input(raw):\n    data = eval(raw)\n    return data['name']","vertical":"software","source":"synthetic","note":"well-specified software prompt with code"}
+{"prompt":"teach me","vertical":"education","source":"synthetic","note":"vague education prompt"}
+{"prompt":"Explain photosynthesis to a fifth-grader in three paragraphs. Paragraph 1: what plants need. Paragraph 2: the role of sunlight. Paragraph 3: why it matters for humans and animals. Avoid jargon.","vertical":"education","source":"synthetic","note":"well-specified education prompt"}
