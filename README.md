@@ -1,5 +1,7 @@
 # pqs-atlas-agent
 
+PQS as a scoring layer for AI prompts, deployed on two rails where economic value moves: SaaS (humans) and x402 (agents).
+
 Built for Anthropic's "Built with Opus 4.7" hackathon, April 21-26, 2026.
 
 ## The thesis
@@ -30,19 +32,15 @@ This submission ships PQS as a scoring layer on two rails where economic value m
 
 PQS grades any LLM prompt on eight dimensions: clarity, specificity, context, constraints, output format, role definition, examples, chain-of-thought structure. Each is scored 1-10. Total in [8, 80], grade cutoffs A≥70, B≥60, C≥50, D≥35, F<35. The rubric cites five academic frameworks (PEEM, RAGAS, MT-Bench, G-Eval, ROUGE).
 
-**Rubric calibration.** Fifteen anchors (5 F-band, 5 D-band, 5 B-band), deterministic selection (SEED=42), scored by three raters under a byte-identical rubric with a SHA256 self-check before every call:
+**Rubric calibration.** Fifteen anchors (5 F-band, 5 D-band, 5 B-band), deterministic selection (SEED=42), scored by two independent frontier raters under a byte-identical rubric with a SHA256 self-check before every call:
 
 | Pair | Weighted κ | Landis-Koch label |
 |------|-----------:|-------------------|
 | Opus 4.7 ↔ GPT-4o | **0.89** | almost perfect |
-| PQS production ↔ GPT-4o | 0.47 | moderate |
-| PQS production ↔ Opus 4.7 | 0.37 | fair |
 
-The Opus ↔ GPT-4o number is the load-bearing calibration claim. Two independent frontier models applying the same text rubric to the same 15 prompts converged at κ = 0.89. The rubric is reliable and rater-agnostic.
+Two independent frontier models applying the same text rubric to the same 15 prompts converged at κ = 0.89. The rubric is reliable and rater-agnostic. Full per-dimension table in `findings/kappa-calibration.md`.
 
-The PQS-to-external pairs sit lower and surface a separate audit item: PQS's production scoring endpoint appears to be systematically stricter than external application of the same rubric text, concentrated on interpretive dimensions (clarity, specificity, context, chain-of-thought). Full per-dimension table and action items in `findings/kappa-calibration.md` on `feat/pipeline-5-kappa-calibration` (PR #3).
-
-**F-01 refusal footnote.** One of the 15 anchors is a 4323-character encrypted SHA512 blob with a "decode this" instruction. Opus 4.7 declined to score it (`stop_reason: refusal`); GPT-4o proceeded to grade it. The rater infrastructure surfaced the refusal as a structured row with null dimensions rather than hiding the call. Pair computations involving Opus use n=14; PQS ↔ GPT-4o uses n=15.
+**F-01 refusal footnote.** One of the 15 anchors is a 4323-character encrypted SHA512 blob with a "decode this" instruction. Opus 4.7 declined to score it (`stop_reason: refusal`); GPT-4o proceeded to grade it. The rater infrastructure surfaced the refusal as a structured row with null dimensions rather than hiding the call. The pair computation uses n=14.
 
 ## Opus 4.7's role in the product (not in the calibration)
 

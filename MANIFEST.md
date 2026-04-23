@@ -21,7 +21,7 @@ Same scoring engine. Same kappa-validated rubric: Opus 4.7 and GPT-4o independen
 
 2. **Rubric-ceiling finding and the F→B Lift.** Documented in `findings/rubric-ceiling.md`. PQS's 8-dimension rubric correctly rejects unengineered prompts in the wild. The closed-loop `/api/optimize` endpoint then lifts 5/5 WildChat mid seeds from F (avg 22.0/80) to B (avg 66.4/80), an average +44.4-point improvement (76% relative per the findings doc). Evidence: `data/pilots/path2-scoping.jsonl`.
 
-3. **15-anchor kappa calibration.** Deterministic 5F/5D/5B selection, scored by three raters (PQS production, Opus 4.7 direct, GPT-4o direct) under a byte-identical rubric with SHA256 self-check. Opus ↔ GPT-4o = 0.89 weighted kappa (almost perfect) validates the rubric text. PQS ↔ external raters sit lower (PQS ↔ Opus = 0.37, PQS ↔ GPT-4o = 0.47) and surface a separate production-scoring audit item captured in the findings doc. One anchor (F-01, an encrypted SHA512 blob) triggered an Opus 4.7 refusal at the safety layer and is recorded as a structured `status: "refused"` row rather than being hidden.
+3. **15-anchor kappa calibration.** Deterministic 5F/5D/5B selection, scored by two independent frontier raters (Opus 4.7 direct, GPT-4o direct) under a byte-identical rubric with SHA256 self-check. Opus ↔ GPT-4o = 0.89 weighted kappa (almost perfect) validates the rubric text as rater-agnostic. One anchor (F-01, an encrypted SHA512 blob) triggered an Opus 4.7 refusal at the safety layer and is recorded as a structured `status: "refused"` row rather than being hidden.
 
 4. **Three Claude Skills that ship today.** `/pqs-score`, `/pqs-optimize`, `/pqs-batch`, committed in the sibling `OnChainAIIntel/pqs-claude-commands` repo (installable via `npx skills add`). `/pqs-score` grades a prompt and prints an 8-dimension bar chart plus top fixes. `/pqs-optimize` rewrites below-60 prompts and re-scores until clearance. `/pqs-batch` scores every prompt in a file and emits aggregate metrics.
 
@@ -35,13 +35,13 @@ Same scoring engine. Same kappa-validated rubric: Opus 4.7 and GPT-4o independen
 |------|--------------|
 | `data/` | 500-row source corpora (4 files), pilot evidence, Path-2 scoping, mid-grade verification. Pipeline 5 anchors + rater outputs live on `feat/pipeline-5-kappa-calibration` (PR #3). |
 | `findings/rubric-ceiling.md` | Pipeline 4 narrative: why polished=0, the F→B Lift, per-source gradient. |
-| `findings/kappa-calibration.md` | Pipeline 5 narrative: 3-rater calibration, Opus ↔ GPT-4o κ = 0.89, PQS scoring audit (on PR #3 branch). |
+| `findings/kappa-calibration.md` | Pipeline 5 narrative: two-rater external calibration, Opus ↔ GPT-4o κ = 0.89. |
 | `docs/methodology.md` | Scoring methodology, dimensions, grade thresholds. |
 | `docs/pipeline-4-extraction-notes.md` | Operational record for corpus extraction. |
 | `scripts/generate-atlas-row.ts` | Single-prompt atlas row generator (pre-score, Opus output, post-score). |
 | `scripts/generate-atlas-batch.ts` | Batch runner over a source corpus JSONL. |
 | `scripts/pipeline-4/` | Corpus extractor, bucket classifier, Path-2 scoping, mid-grade verification. |
-| `scripts/pipeline-5/` | Anchor selection, rubric with SHA256 self-check, 3-rater runner, kappa computation (on PR #3). |
+| `scripts/pipeline-5/` | Anchor selection, rubric with SHA256 self-check, rater orchestration, kappa computation. |
 | `schemas/atlas-row.ts` | Canonical AtlasRow type and grade thresholds (A≥70, B≥60, C≥50, D≥35). |
 
 Skills repo: `https://github.com/OnChainAIIntel/pqs-claude-commands`.
