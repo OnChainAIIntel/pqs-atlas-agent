@@ -9,12 +9,16 @@
  *     payment based on the score surfaced in the requirement memo.
  *
  * Env vars (loaded from .env.local via dotenv):
- *   VIRTUALS_AGENT_WALLET              seller smart-wallet address (0x...)
- *   VIRTUALS_AGENT_PRIVATE_KEY         seller whitelisted signing key (0x...)
- *   VIRTUALS_SESSION_ENTITY_KEY_ID     seller session entity id (integer)
- *   VIRTUALS_BUYER_WALLET              buyer smart-wallet address (0x...)
- *   VIRTUALS_BUYER_PRIVATE_KEY         buyer whitelisted signing key (0x...)
- *   VIRTUALS_BUYER_ENTITY_ID           buyer session entity id (integer)
+ *   VIRTUALS_ATLAS_AGENT_WALLET                 seller smart-wallet address (0x...)
+ *   VIRTUALS_ATLAS_AGENT_PRIVATE_KEY             seller whitelisted signing key (0x...)
+ *   VIRTUALS_ATLAS_AGENT_SESSION_ENTITY_KEY_ID   seller session entity id (integer)
+ *   VIRTUALS_BUYER_AGENT_WALLET                 buyer smart-wallet address (0x...)
+ *   VIRTUALS_BUYER_AGENT_PRIVATE_KEY             buyer whitelisted signing key (0x...)
+ *   VIRTUALS_BUYER_AGENT_SESSION_ENTITY_KEY_ID   buyer session entity id (integer)
+ *
+ * Private-key format note: Virtuals session entity keys are P-256 (EC), not
+ * secp256k1 Ethereum keys. AcpContractClientV2.build() accepts them as-is
+ * (raw 32-byte hex, 0x-prefixed). No format conversion on our end.
  *
  * Chain: Base mainnet. Payment route: x402 (routes through ACP's v2 x402
  * config so the buyer's payAndAcceptRequirement lands as a real on-chain
@@ -49,17 +53,6 @@ function required(name: string): string {
   return v.trim();
 }
 
-function requiredInt(name: string): number {
-  const raw = required(name);
-  const n = parseInt(raw, 10);
-  if (!Number.isFinite(n)) {
-    throw new Error(
-      `[virtuals-client] env var ${name} must be an integer (got ${raw}).`,
-    );
-  }
-  return n;
-}
-
 // USDC on Base mainnet. Used for FareAmount construction when initiating a job.
 export const BASE_USDC_ADDRESS: Address =
   "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -77,14 +70,20 @@ export interface BuyerOptions {
 
 /**
  * Build the seller-side AcpClient. The seller listens on the agent wallet
- * (VIRTUALS_AGENT_WALLET) and handles REQUEST → NEGOTIATION (accept + put
- * AtlasRow preview in requirement) and TRANSACTION → EVALUATION (deliver
- * full AtlasRow) transitions inside the supplied onNewTask.
+ * (VIRTUALS_ATLAS_AGENT_WALLET) and handles REQUEST → NEGOTIATION (accept
+ * + put AtlasRow preview in requirement) and TRANSACTION → EVALUATION
+ * (deliver full AtlasRow) transitions inside the supplied onNewTask.
  */
 export async function buildSeller(opts: SellerOptions): Promise<AcpClient> {
-  const agentWallet = required("VIRTUALS_AGENT_WALLET") as Address;
-  const agentKey = required("VIRTUALS_AGENT_PRIVATE_KEY") as Address;
-  const entityId = requiredInt("VIRTUALS_SESSION_ENTITY_KEY_ID");
+  const agentWallet = required("VIRTUALS_ATLAS_AGENT_WALLET") as Address;
+  const agentKey = required("VIRTUALS_ATLAS_AGENT_PRIVATE_KEY") as Address;
+  // sessionEntityKeyId is a base64 DER-encoded P-256 public key, passed
+  // through to the SDK as-is (no parseInt). SDK's .d.ts types it as `number`
+  // but runtime forwards it to Alchemy's Modular Account V2 Client
+  // signerEntity.entityId which accepts string/number alike.
+  const entityId = required(
+    "VIRTUALS_ATLAS_AGENT_SESSION_ENTITY_KEY_ID",
+  ) as unknown as number;
 
   const contractClient = await AcpContractClientV2.build(
     agentKey,
@@ -105,9 +104,12 @@ export async function buildSeller(opts: SellerOptions): Promise<AcpClient> {
  * or reject) and COMPLETED/REJECTED terminal phases.
  */
 export async function buildBuyer(opts: BuyerOptions): Promise<AcpClient> {
-  const buyerWallet = required("VIRTUALS_BUYER_WALLET") as Address;
-  const buyerKey = required("VIRTUALS_BUYER_PRIVATE_KEY") as Address;
-  const entityId = requiredInt("VIRTUALS_BUYER_ENTITY_ID");
+  const buyerWallet = required("VIRTUALS_BUYER_AGENT_WALLET") as Address;
+  const buyerKey = required("VIRTUALS_BUYER_AGENT_PRIVATE_KEY") as Address;
+  // See buildSeller() for entity-ID pass-through note.
+  const entityId = required(
+    "VIRTUALS_BUYER_AGENT_SESSION_ENTITY_KEY_ID",
+  ) as unknown as number;
 
   const contractClient = await AcpContractClientV2.build(
     buyerKey,
@@ -128,12 +130,12 @@ export async function buildBuyer(opts: BuyerOptions): Promise<AcpClient> {
  * logic.
  */
 export function getSellerWallet(): Address {
-  return required("VIRTUALS_AGENT_WALLET") as Address;
+  return required("VIRTUALS_ATLAS_AGENT_WALLET") as Address;
 }
 
 /**
  * Read-only helper: return resolved buyer wallet from env.
  */
 export function getBuyerWallet(): Address {
-  return required("VIRTUALS_BUYER_WALLET") as Address;
+  return required("VIRTUALS_BUYER_AGENT_WALLET") as Address;
 }
