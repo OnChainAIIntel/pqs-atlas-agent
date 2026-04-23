@@ -1,4 +1,4 @@
-# Rubric Ceiling — Why Pipeline 4 has 0 polished rows
+# Rubric Ceiling and the F→B Lift: Pipeline 4 Findings
 
 **Status:** Finding  •  **Pipeline:** 4 (Atlas source corpus)  •  **Date:** 2026-04-23
 
@@ -189,15 +189,19 @@ Pipeline 5 source-weighting work should start from:
 **Zero calibration anchors above F exist in Pipeline 4's output.** A
 kappa calibration drawing 15 rows from this corpus would see a single-
 grade distribution (all F) and produce an undefined/meaningless kappa.
-This is a *coverage* problem, not a tuning problem.
+This is a *coverage* problem, not a tuning problem. Arm 3 (the F→B Lift)
+resolves this coverage gap by generating B-band anchors from the same
+corpus via optimization.
 
-**Path forward ("Path 2"):** curate D/C/B/A exemplars outside
-Pipeline 4. Three arms evaluated in the scoping diagnostic
+**Path forward ("Path 2"):** curate D/C/B/A exemplars via external
+sources or closed-loop optimization of Pipeline 4 rows. Three arms
+evaluated in the scoping diagnostic
 (`scripts/pipeline-4/scope-path2.py` → `data/pilots/path2-scoping.jsonl`):
 - Anthropic prompt library (reference-class prompt-engineered)
 - Awesome ChatGPT Prompts (curated, non-rubric-targeted)
-- LLM-regenerated rewrites of WildChat mid-top-quartile rows via
-  `/api/optimize` (closed-loop)
+- LLM-regenerated rewrites of WildChat mid-top-quartile rows via the
+  F→B Lift (`mcp__pqs__optimize_prompt`; HTTP `/api/optimize` endpoint
+  is origin-locked)
 
 The scoping diagnostic settles which arm(s) yield anchors at rate.
 
@@ -232,7 +236,7 @@ Evidence: `data/pilots/path2-scoping.jsonl` (15 rows total).
 | `travel-guide`          | 30 | F |
 | **avg** | **35.8** | 4×D, 1×F |
 
-### Arm 3 — WildChat mid rewrites via `mcp__pqs__optimize_prompt`
+### Arm 3: The F→B Lift (WildChat rewrites via `mcp__pqs__optimize_prompt`)
 
 The HTTP endpoint `/api/optimize` is origin-locked to
 `pqs.onchainintel.net` (HTTP 403 for API-key callers). The MCP tool
@@ -285,7 +289,7 @@ Pipeline 5 should either apply a content filter upstream or use
 LMSYS/no_robots as the preferred messy/mid source where quality
 allows.
 
-### Closed-loop demo narrative (unblocked)
+### The F→B Lift: closed-loop demo narrative (unblocked)
 
 The three-arm result unlocks the PQS story: *"PQS identifies weak
 prompts in the wild (F-grade WildChat mid rows at 12–29/80), optimizes
