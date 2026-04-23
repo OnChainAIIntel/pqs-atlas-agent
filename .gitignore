@@ -49,3 +49,12 @@ data/atlas-failures.jsonl
 !data/source-prompts-full-sampled.jsonl
 !data/source-prompts-clean-deterministic.jsonl
 !data/source-prompts-clean-sampled.jsonl
+
+# Pipeline 4 pilot evidence — tracked (included in PR #1)
+!data/pilots/
+!data/pilots/**
+
+# Pipeline 5 deliverables — kappa-calibration artifacts are tracked
+!data/pipeline-5-anchors.jsonl
+!data/pipeline-5-rater-outputs.jsonl
+!data/pipeline-5-kappa-results.json
