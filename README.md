@@ -26,7 +26,39 @@ This submission ships PQS as a scoring layer on two rails where economic value m
 
 **What it does:** this repo. `scripts/generate-atlas-row.ts` and `scripts/generate-atlas-batch.ts` exercise the agent-side rail end-to-end. Every prompt is scored pre-flight via `POST /api/score/full` before it hits a model, and the optimize call routes as a $0.025 USDC x402 payment on Base mainnet via the `mcp__pqs__optimize_prompt` MCP tool (the `/api/optimize` HTTP endpoint is origin-locked). Output is a graded `AtlasRow` with pre-score, Opus 4.7 output, post-score, and dimension-level rationales.
 
-**What's demo-scoped:** the x402 rail in this repo runs as a CLI-triggered batch, not a fully autonomous polling loop. The marketplace-polling, decision-making, action-taking agent is v2 roadmap and is not demoed here.
+**What's demo-scoped:** the x402 rail in this repo runs as a CLI-triggered batch. The Virtuals ACP v2 marketplace integration (below) extends this into a live provider that a buyer can transact with for real USDC on Base mainnet. The fully autonomous polling loop is v2 roadmap.
+
+### Virtuals ACP v2 marketplace integration (Beat 2)
+
+This repo also ships the pqs-atlas-agent as a self-hosted service provider on the [Virtuals ACP](https://app.virtuals.io/acp/join) marketplace. A buyer initiates a targeted job carrying a `{ prompt, vertical }` schema; the seller runs the PQS pipeline synchronously, surfaces the resulting `AtlasRow` in the NEGOTIATION requirement memo so the buyer can grade-gate payment, and the buyer calls `payAndAcceptRequirement()` only when `pre_score.total >= 60` (grade B or above). Settlement is a real on-chain USDC transfer on Base mainnet via the x402 payment route; the tx hash is captured in the buyer script's output and viewable on Basescan.
+
+**Protocol flow (skip-evaluation pattern, evaluator = `undefined`):**
+
+1. `REQUEST → NEGOTIATION`: buyer initiates job with `{ prompt, vertical }` schema and $0.10 USDC escrow. Seller's `onNewTask` handler runs `generateAtlasRow()`, calls `job.accept()`, then `job.createRequirement()` with the full `AtlasRow` JSON as the memo content.
+2. `NEGOTIATION → TRANSACTION`: buyer's handler parses the `AtlasRow` from the requirement, checks `pre_score.total`, and calls `payAndAcceptRequirement()` on B+ or `reject()` otherwise.
+3. `TRANSACTION → EVALUATION`: seller re-emits the `AtlasRow` via `job.deliver()` as the canonical on-chain deliverable.
+4. `EVALUATION → COMPLETED`: auto-completes under the skip-evaluation pattern.
+
+**CLI:**
+
+```bash
+cp .env.example .env.local
+# Fill the VIRTUALS_* vars (seller + buyer wallet, private key, entity ID).
+npm install
+
+# Start the seller listener (agent ONLINE on the Virtuals dashboard).
+npm run serve
+
+# In a second terminal, initiate a targeted grade-gated job.
+npm run buy -- "write a production-ready onboarding email for a B2B SaaS"
+
+# Print resolved env + wallets without touching the network.
+npm run status
+```
+
+The underlying scripts (`scripts/atlas-agent-serve.ts`, `scripts/atlas-agent-buy.ts`) and the thin SDK wrapper (`src/virtuals-client.ts`) implement the protocol flow above. The CLI wrapper (`bin/atlas-agent.ts`) forwards to them.
+
+**Implementation note on payment semantics.** The raw brief described the pipeline prepaying PQS $0.025 via an existing x402 MCP tool, but the production pipeline uses a Bearer API key (`PQS_API_KEY`) that represents pre-funded PQS credit — there is no per-call x402 step on the seller side. The real on-chain USDC transaction captured by this integration is the buyer → seller settlement via Virtuals ACP's x402 route, which is what lands on Basescan.
 
 ## The scoring substrate
 
@@ -93,8 +125,8 @@ We used PQS to score the prompt we used to audit our own agent during the build.
 
 ## Roadmap (v2, not demoed)
 
-- Marketplace integration for the x402 rail via a Daydreams-style adapter: agents discover listings, score inbound prompts, route payments, act.
-- Full autonomous polling loop with persisted session state and an observable trace surface for judges or auditors.
+- Autonomous polling loop on top of the Virtuals ACP integration: agent self-selects inbound prompts, scores, routes payments, acts without CLI invocation.
+- Persisted session state and an observable trace surface for judges or auditors.
 - `marketplace-agent` Skill wrapping the discovery and action path.
 - `managed-agent-session` Skill wrapping durable multi-prompt sessions.
 
