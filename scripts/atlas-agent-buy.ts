@@ -33,53 +33,11 @@ import {
   BASE_USDC_ADDRESS,
   USDC_DECIMALS,
 } from "../src/virtuals-client.js";
-import type { AtlasRow } from "../schemas/atlas-row.js";
+import { tryParseAtlasRow, shouldPay } from "../src/grade-gate.js";
 
 // ---------- config ----------
 
 const ESCROW_USDC = 0.1; // $0.10 demo escrow
-const GRADE_GATE_MIN_TOTAL = 60; // pre_score.total >= 60 == grade B
-
-// ---------- helpers ----------
-
-function tryParseAtlasRow(raw: unknown): AtlasRow | null {
-  if (typeof raw === "string") {
-    try {
-      return JSON.parse(raw) as AtlasRow;
-    } catch {
-      return null;
-    }
-  }
-  if (raw && typeof raw === "object") {
-    // Already parsed; trust its shape (server-side did JSON.stringify).
-    return raw as AtlasRow;
-  }
-  return null;
-}
-
-function shouldPay(row: AtlasRow | null): { pay: boolean; reason: string } {
-  if (!row) {
-    return {
-      pay: false,
-      reason: "seller requirement did not contain a parseable AtlasRow",
-    };
-  }
-  const total = row.pre_score?.total;
-  const grade = row.pre_grade;
-  if (typeof total !== "number") {
-    return { pay: false, reason: "AtlasRow missing pre_score.total" };
-  }
-  if (total >= GRADE_GATE_MIN_TOTAL) {
-    return {
-      pay: true,
-      reason: `pre_score.total=${total}/80 grade=${grade} — meets B+ gate`,
-    };
-  }
-  return {
-    pay: false,
-    reason: `pre_score.total=${total}/80 grade=${grade} — below B gate (${GRADE_GATE_MIN_TOTAL}/80)`,
-  };
-}
 
 // ---------- main ----------
 

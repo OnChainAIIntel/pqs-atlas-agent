@@ -12,7 +12,9 @@
     "atlas-agent": "tsx bin/atlas-agent.ts",
     "serve": "tsx bin/atlas-agent.ts serve",
     "buy": "tsx bin/atlas-agent.ts buy",
-    "status": "tsx bin/atlas-agent.ts status"
+    "status": "tsx bin/atlas-agent.ts status",
+    "doctor": "tsx bin/atlas-agent.ts doctor",
+    "test": "tsx scripts/test-grade-gate.ts"
   },
   "dependencies": {
     "@virtuals-protocol/acp-node": "^0.3.0-beta.40",

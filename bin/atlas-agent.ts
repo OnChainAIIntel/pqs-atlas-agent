@@ -30,6 +30,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
 const SERVE_SCRIPT = resolve(REPO_ROOT, "scripts", "atlas-agent-serve.ts");
 const BUY_SCRIPT = resolve(REPO_ROOT, "scripts", "atlas-agent-buy.ts");
+const DOCTOR_SCRIPT = resolve(REPO_ROOT, "scripts", "atlas-agent-doctor.ts");
 
 function usage(): void {
   console.error(`Usage: atlas-agent <command> [args]
@@ -38,6 +39,7 @@ Commands:
   serve                              Start the seller listener (agent ONLINE).
   buy <prompt> [--vertical <v>]      Initiate a grade-gated targeted job.
   status                             Print resolved env vars and wallets.
+  doctor                             Full preflight check — env, SDK, constants.
 
 Environment: loads .env.local from repo root.`);
 }
@@ -113,6 +115,10 @@ async function main(): Promise<void> {
     }
     case "status": {
       await status();
+      break;
+    }
+    case "doctor": {
+      runTsx(DOCTOR_SCRIPT, rest);
       break;
     }
     case "-h":
