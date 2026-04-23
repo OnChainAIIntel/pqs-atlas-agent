@@ -82,6 +82,8 @@ This is evidence of differing input-safety posture across frontier models, captu
 
 ## Results
 
+The raw data file `data/pipeline-5-rater-outputs.jsonl` contains 45 rows including 15 from an earlier PQS production scoring pass retained as appendix artifacts. The calibration narrative above uses only the 30 rows from the two external raters (Opus 4.7 and GPT-4o).
+
 ### Pairwise grade-level kappa
 
 | Pair | n | κ (weighted) | Landis-Koch label |
@@ -160,5 +162,7 @@ python scripts/pipeline-5/select-anchors.py
 python scripts/pipeline-5/run-raters.py
 python scripts/pipeline-5/compute-kappa.py
 ```
+
+`PQS_API_KEY` and `PQS_INTERNAL_TOKEN` are optional. They are only required to regenerate the 15 Rater 1 appendix rows in the raw data file. The calibration claim (κ=0.89 rubric validation) can be reproduced with just `ANTHROPIC_KEY` and `OPENAI_API_KEY`.
 
 The rubric SHA is asserted pre-flight. Any future rubric edit surfaces immediately as a mismatch and forces a full re-run of the scoring calls.
