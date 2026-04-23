@@ -15,6 +15,11 @@ dist/
 .env.local
 .env.*.local
 
+# Python venv (Pipeline 4 extraction)
+.venv-pipeline4/
+__pycache__/
+*.pyc
+
 # Logs
 *.log
 logs/
@@ -38,3 +43,9 @@ data/atlas-failures.jsonl
 # Inputs + directory marker — must stay tracked
 !data/.gitkeep
 !data/source-prompts.jsonl
+
+# Pipeline 4 deliverables — 4 final corpus files are tracked
+!data/source-prompts-full-deterministic.jsonl
+!data/source-prompts-full-sampled.jsonl
+!data/source-prompts-clean-deterministic.jsonl
+!data/source-prompts-clean-sampled.jsonl
