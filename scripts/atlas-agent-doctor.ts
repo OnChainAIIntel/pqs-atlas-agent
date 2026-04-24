@@ -43,12 +43,10 @@ function isHexAddress(s: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(s);
 }
 
-// Virtuals session entity keys are P-256 (EC), not secp256k1. In practice
-// the key material arrives as PKCS8 PEM stripped of headers — i.e. base64
-// content only ("MIGHAg..."). Sanity check that it looks like non-empty
-// base64 of reasonable length.
-function isBase64ish(s: string, minLen = 40): boolean {
-  return s.length >= minLen && /^[A-Za-z0-9+/=]+$/.test(s);
+// secp256k1 private key from Rabby / a standard EOA: 0x + 64 hex chars.
+// The whitelisted signer for the Virtuals smart wallet uses this format.
+function isHexPrivateKey(s: string): boolean {
+  return /^0x[0-9a-fA-F]{64}$/.test(s);
 }
 
 function checkAddressEnv(name: string): void {
@@ -63,25 +61,21 @@ function checkAddressEnv(name: string): void {
 function checkPrivateKeyEnv(name: string): void {
   const v = process.env[name];
   if (!v) return fail(name, "not set in .env.local");
-  if (!isBase64ish(v, 60)) {
+  if (!isHexPrivateKey(v)) {
     return fail(
       name,
-      "invalid private-key format (expect base64 PKCS8 PEM content, ~120+ chars)",
+      "invalid private-key format (expect 0x + 64 hex, secp256k1 from Rabby/EOA)",
     );
   }
-  pass(name, `set (${v.length} chars base64)`);
+  pass(name, `set (${v.slice(0, 6)}...${v.slice(-4)})`);
 }
 
-function checkSessionEntityKeyEnv(name: string): void {
+function checkIntEnv(name: string): void {
   const v = process.env[name];
   if (!v) return fail(name, "not set in .env.local");
-  if (!isBase64ish(v, 40)) {
-    return fail(
-      name,
-      "invalid session-entity-key format (expect base64 DER pubkey, ~120 chars)",
-    );
-  }
-  pass(name, `set (${v.length} chars base64)`);
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n)) return fail(name, `not an integer: ${v}`);
+  pass(name, `set (${n})`);
 }
 
 function checkStringEnv(name: string, minLen = 1): void {
@@ -95,10 +89,10 @@ function checkStringEnv(name: string, minLen = 1): void {
 
 checkAddressEnv("VIRTUALS_ATLAS_AGENT_WALLET");
 checkPrivateKeyEnv("VIRTUALS_ATLAS_AGENT_PRIVATE_KEY");
-checkSessionEntityKeyEnv("VIRTUALS_ATLAS_AGENT_SESSION_ENTITY_KEY_ID");
+checkIntEnv("VIRTUALS_ATLAS_AGENT_SESSION_ENTITY_KEY_ID");
 checkAddressEnv("VIRTUALS_BUYER_AGENT_WALLET");
 checkPrivateKeyEnv("VIRTUALS_BUYER_AGENT_PRIVATE_KEY");
-checkSessionEntityKeyEnv("VIRTUALS_BUYER_AGENT_SESSION_ENTITY_KEY_ID");
+checkIntEnv("VIRTUALS_BUYER_AGENT_SESSION_ENTITY_KEY_ID");
 
 // ---------- PQS pipeline checks ----------
 

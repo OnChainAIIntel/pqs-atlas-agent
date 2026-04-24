@@ -53,6 +53,17 @@ function required(name: string): string {
   return v.trim();
 }
 
+function requiredInt(name: string): number {
+  const raw = required(name);
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) {
+    throw new Error(
+      `[virtuals-client] env var ${name} must be an integer (got ${raw}).`,
+    );
+  }
+  return n;
+}
+
 // USDC on Base mainnet. Used for FareAmount construction when initiating a job.
 export const BASE_USDC_ADDRESS: Address =
   "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -77,13 +88,14 @@ export interface BuyerOptions {
 export async function buildSeller(opts: SellerOptions): Promise<AcpClient> {
   const agentWallet = required("VIRTUALS_ATLAS_AGENT_WALLET") as Address;
   const agentKey = required("VIRTUALS_ATLAS_AGENT_PRIVATE_KEY") as Address;
-  // sessionEntityKeyId is a base64 DER-encoded P-256 public key, passed
-  // through to the SDK as-is (no parseInt). SDK's .d.ts types it as `number`
-  // but runtime forwards it to Alchemy's Modular Account V2 Client
-  // signerEntity.entityId which accepts string/number alike.
-  const entityId = required(
+  // SDK types sessionEntityKeyId as `number` and runtime forwards it to
+  // Alchemy Modular Account V2's signerEntity.entityId (the on-chain
+  // entity ID registered when the EOA was whitelisted for this smart
+  // wallet). Virtuals dashboard doesn't expose this — trial the default
+  // `1` first; if the SDK throws an entity-related error, increment.
+  const entityId = requiredInt(
     "VIRTUALS_ATLAS_AGENT_SESSION_ENTITY_KEY_ID",
-  ) as unknown as number;
+  );
 
   const contractClient = await AcpContractClientV2.build(
     agentKey,
@@ -106,10 +118,8 @@ export async function buildSeller(opts: SellerOptions): Promise<AcpClient> {
 export async function buildBuyer(opts: BuyerOptions): Promise<AcpClient> {
   const buyerWallet = required("VIRTUALS_BUYER_AGENT_WALLET") as Address;
   const buyerKey = required("VIRTUALS_BUYER_AGENT_PRIVATE_KEY") as Address;
-  // See buildSeller() for entity-ID pass-through note.
-  const entityId = required(
-    "VIRTUALS_BUYER_AGENT_SESSION_ENTITY_KEY_ID",
-  ) as unknown as number;
+  // See buildSeller() for entity-ID note.
+  const entityId = requiredInt("VIRTUALS_BUYER_AGENT_SESSION_ENTITY_KEY_ID");
 
   const contractClient = await AcpContractClientV2.build(
     buyerKey,

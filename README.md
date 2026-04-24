@@ -30,33 +30,42 @@ This submission ships PQS as a scoring layer on two rails where economic value m
 
 ### Virtuals ACP v2 marketplace integration (Beat 2)
 
-This repo also ships the pqs-atlas-agent as a self-hosted service provider on the [Virtuals ACP](https://app.virtuals.io/acp/join) marketplace. A buyer initiates a targeted job carrying a `{ prompt, vertical }` schema; the seller runs the PQS pipeline synchronously, surfaces the resulting `AtlasRow` in the NEGOTIATION requirement memo so the buyer can grade-gate payment, and the buyer calls `payAndAcceptRequirement()` only when `pre_score.total >= 60` (grade B or above). Settlement is a real on-chain USDC transfer on Base mainnet via the x402 payment route; the tx hash is captured in the buyer script's output and viewable on Basescan.
+This repo ships the pqs-atlas-agent as a self-hosted service provider on the [Virtuals ACP](https://app.virtuals.io/acp/join) marketplace. A buyer initiates a targeted job carrying a `{ prompt, vertical }` schema; the seller runs the PQS pipeline synchronously, returns the resulting `AtlasRow` as the deliverable, and settlement is a real on-chain USDC transfer on Base mainnet captured via Virtuals' x402 payment route.
 
-**Protocol flow (skip-evaluation pattern, evaluator = `undefined`):**
+**Architecture: openclaw-acp CLI (not raw @virtuals-protocol/acp-node SDK).** Beat 2 routes through the Virtuals `openclaw-acp` CLI tool (github.com/Virtual-Protocol/openclaw-acp), not the raw Node SDK. The raw SDK requires a pre-deployed Modular Account V2 smart wallet on Base mainnet, and Virtuals' dashboard-side deploy step is no longer documented (whitepaper URLs 404). The CLI auto-provisions the wallet via Virtuals' backend API (`acpx.virtuals.io`), which is the supported self-hosted path today. This pivot is documented in `openclaw-templates/README.md`.
 
-1. `REQUEST → NEGOTIATION`: buyer initiates job with `{ prompt, vertical }` schema and $0.10 USDC escrow. Seller's `onNewTask` handler runs `generateAtlasRow()`, calls `job.accept()`, then `job.createRequirement()` with the full `AtlasRow` JSON as the memo content.
-2. `NEGOTIATION → TRANSACTION`: buyer's handler parses the `AtlasRow` from the requirement, checks `pre_score.total`, and calls `payAndAcceptRequirement()` on B+ or `reject()` otherwise.
-3. `TRANSACTION → EVALUATION`: seller re-emits the `AtlasRow` via `job.deliver()` as the canonical on-chain deliverable.
-4. `EVALUATION → COMPLETED`: auto-completes under the skip-evaluation pattern.
+**Layout:**
 
-**CLI:**
+- `openclaw-templates/pqs_atlas_score/` — copy-in `offering.json` + `handlers.ts` for the openclaw-acp CLI. `handlers.ts` is a thin adapter that re-exports `executeJobHandler` / `validateRequirementsHandler` / `requestPaymentHandler` from this repo.
+- `scripts/virtuals-handler.ts` — the source-of-truth handler logic. Wraps `generateAtlasRow()` behind the openclaw-acp `ExecuteJobResult` contract. Any update to the PQS pipeline lands here, not in the CLI repo.
+- `scripts/atlas-agent-resume.sh` — one-shot setup + buy driver. Walks through `acp setup` (browser-blocked), `acp sell init`, template copy, `acp sell create`, `acp serve start` in the background, and finally `acp job create` + poll + pay.
+- `src/grade-gate.ts` — reusable grade-gate logic (pre_score.total ≥ 60). Unit-tested via `npm test`. Used by the buyer to decide whether the AtlasRow deliverable was worth paying for.
+- `src/virtuals-client.ts`, `scripts/atlas-agent-{serve,buy,doctor}.ts`, `bin/atlas-agent.ts` — retained as a **reference implementation** of the raw-SDK path. They typecheck and can be invoked once Virtuals exposes a wallet-deploy step, but are not the live path.
+
+**Protocol flow via openclaw-acp:**
+
+1. Buyer: `acp job create <seller-wallet> pqs_atlas_score --requirements '{"prompt":"...","vertical":"software"}'` — creates a $0.10 USDC fixed-fee job.
+2. Seller runtime (`acp serve start`) receives the request, calls `validateRequirementsHandler` to reject malformed prompts early, then emits the payment request with the message from `requestPaymentHandler`.
+3. Buyer: `acp job pay <jobId> --accept true` — settles $0.10 USDC on Base mainnet via ACP's x402 route.
+4. Seller runtime calls `executeJobHandler` which runs `generateAtlasRow()` (pre-score + post-score + Opus 4.7 output). The AtlasRow JSON is delivered.
+5. Buyer applies `shouldPay` from `src/grade-gate.ts` client-side to audit whether the returned AtlasRow met the B+ gate; rejection → reputational signal, not a refund (payment already settled on-chain in step 3). This is a documented tradeoff of the openclaw-acp fixed-fee flow vs the raw-SDK `payAndAcceptRequirement` pattern.
+
+**CLI (morning resume):**
 
 ```bash
-cp .env.example .env.local
-# Fill the VIRTUALS_* vars (seller + buyer wallet, private key, entity ID).
-npm install
+# One-time:
+git clone https://github.com/Virtual-Protocol/openclaw-acp ~/Desktop/openclaw-acp
+cd ~/Desktop/openclaw-acp && npm install && npm link
 
-# Start the seller listener (agent ONLINE on the Virtuals dashboard).
-npm run serve
+# From pqs-atlas-agent repo root, run setup (browser-blocked on acp setup):
+./scripts/atlas-agent-resume.sh setup
 
-# In a second terminal, initiate a targeted grade-gated job.
-npm run buy -- "write a production-ready onboarding email for a B2B SaaS"
+# After creating a second buyer agent + topup, drive an E2E buy:
+./scripts/atlas-agent-resume.sh buy "write a production-ready onboarding email for a B2B SaaS"
 
-# Print resolved env + wallets without touching the network.
-npm run status
+# Check state at any time:
+./scripts/atlas-agent-resume.sh status
 ```
-
-The underlying scripts (`scripts/atlas-agent-serve.ts`, `scripts/atlas-agent-buy.ts`) and the thin SDK wrapper (`src/virtuals-client.ts`) implement the protocol flow above. The CLI wrapper (`bin/atlas-agent.ts`) forwards to them.
 
 **Implementation note on payment semantics.** The raw brief described the pipeline prepaying PQS $0.025 via an existing x402 MCP tool, but the production pipeline uses a Bearer API key (`PQS_API_KEY`) that represents pre-funded PQS credit — there is no per-call x402 step on the seller side. The real on-chain USDC transaction captured by this integration is the buyer → seller settlement via Virtuals ACP's x402 route, which is what lands on Basescan.
 
