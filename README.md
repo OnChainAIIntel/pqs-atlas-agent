@@ -50,22 +50,32 @@ This repo ships the pqs-atlas-agent as a self-hosted service provider on the [Vi
 4. Seller runtime calls `executeJobHandler` which runs `generateAtlasRow()` (pre-score + post-score + Opus 4.7 output). The AtlasRow JSON is delivered.
 5. Buyer applies `shouldPay` from `src/grade-gate.ts` client-side to audit whether the returned AtlasRow met the B+ gate; rejection → reputational signal, not a refund (payment already settled on-chain in step 3). This is a documented tradeoff of the openclaw-acp fixed-fee flow vs the raw-SDK `payAndAcceptRequirement` pattern.
 
-**CLI (morning resume):**
+**CLI.** `scripts/atlas-agent-ship.sh` is the canonical driver. (Earlier
+`atlas-agent-resume.sh` is retained for reference; it had two bugs —
+bash-portable `read` syntax and underscore-vs-hyphen agent-slug derivation
+— that `atlas-agent-ship.sh` fixes.)
 
 ```bash
 # One-time:
 git clone https://github.com/Virtual-Protocol/openclaw-acp ~/Desktop/openclaw-acp
 cd ~/Desktop/openclaw-acp && npm install && npm link
+acp setup                     # browser OAuth. Creates pqs-atlas-seller agent.
+acp agent create pqs-buyer    # second agent for the buyer side.
 
-# From pqs-atlas-agent repo root, run setup (browser-blocked on acp setup):
-./scripts/atlas-agent-resume.sh setup
-
-# After creating a second buyer agent + topup, drive an E2E buy:
-./scripts/atlas-agent-resume.sh buy "write a production-ready onboarding email for a B2B SaaS"
-
-# Check state at any time:
-./scripts/atlas-agent-resume.sh status
+# From pqs-atlas-agent repo root:
+./scripts/atlas-agent-ship.sh seller-up   # copy templates + sell create + serve
+./scripts/atlas-agent-ship.sh check       # on-chain balance check via Base RPC
+./scripts/atlas-agent-ship.sh buy "write a production-ready onboarding email for a B2B SaaS"
+./scripts/atlas-agent-ship.sh status      # active agent + serve + sell list + balances
 ```
+
+Single-machine flip note: `acp agent switch` stops the seller runtime (the
+runtime is bound to the current agent's API key). The `buy` subcommand
+handles this automatically: stop-seller → switch-to-buyer → `acp job create
+--isAutomated true` → switch-back-to-seller → restart serve → poll until
+COMPLETED. `--isAutomated true` means the ACP server auto-accepts payment
+on the buyer's behalf when the seller emits the NEGOTIATION memo, so we
+don't need to flip back to the buyer for `acp job pay`.
 
 **Implementation note on payment semantics.** The raw brief described the pipeline prepaying PQS $0.025 via an existing x402 MCP tool, but the production pipeline uses a Bearer API key (`PQS_API_KEY`) that represents pre-funded PQS credit — there is no per-call x402 step on the seller side. The real on-chain USDC transaction captured by this integration is the buyer → seller settlement via Virtuals ACP's x402 route, which is what lands on Basescan.
 
