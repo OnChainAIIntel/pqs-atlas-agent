@@ -26,7 +26,69 @@ This submission ships PQS as a scoring layer on two rails where economic value m
 
 **What it does:** this repo. `scripts/generate-atlas-row.ts` and `scripts/generate-atlas-batch.ts` exercise the agent-side rail end-to-end. Every prompt is scored pre-flight via `POST /api/score/full` before it hits a model, and the optimize call routes as a $0.025 USDC x402 payment on Base mainnet via the `mcp__pqs__optimize_prompt` MCP tool (the `/api/optimize` HTTP endpoint is origin-locked). Output is a graded `AtlasRow` with pre-score, Opus 4.7 output, post-score, and dimension-level rationales.
 
-**What's demo-scoped:** the x402 rail in this repo runs as a CLI-triggered batch, not a fully autonomous polling loop. The marketplace-polling, decision-making, action-taking agent is v2 roadmap and is not demoed here.
+**What's demo-scoped:** the x402 rail in this repo runs as a CLI-triggered batch. The Virtuals ACP v2 marketplace integration (below) extends this into a live provider that a buyer can transact with for real USDC on Base mainnet. The fully autonomous polling loop is v2 roadmap.
+
+### Virtuals ACP v2 marketplace integration (Beat 2)
+
+This repo ships the pqs-atlas-agent as a self-hosted service provider on the [Virtuals ACP](https://app.virtuals.io/acp/join) marketplace. A buyer initiates a targeted job carrying a `{ prompt, vertical }` schema; the seller runs the PQS pipeline synchronously, returns the resulting `AtlasRow` as the deliverable, and settlement is a real on-chain USDC transfer on Base mainnet captured via Virtuals' x402 payment route.
+
+**Architecture: openclaw-acp CLI (not raw @virtuals-protocol/acp-node SDK).** Beat 2 routes through the Virtuals `openclaw-acp` CLI tool (github.com/Virtual-Protocol/openclaw-acp), not the raw Node SDK. The raw SDK requires a pre-deployed Modular Account V2 smart wallet on Base mainnet, and Virtuals' dashboard-side deploy step is no longer documented (whitepaper URLs 404). The CLI auto-provisions the wallet via Virtuals' backend API (`acpx.virtuals.io`), which is the supported self-hosted path today. This pivot is documented in `openclaw-templates/README.md`.
+
+**Layout:**
+
+- `openclaw-templates/pqs_atlas_score/` — copy-in `offering.json` + `handlers.ts` for the openclaw-acp CLI. `handlers.ts` is a thin adapter that re-exports `executeJobHandler` / `validateRequirementsHandler` / `requestPaymentHandler` from this repo.
+- `scripts/virtuals-handler.ts` — the source-of-truth handler logic. Wraps `generateAtlasRow()` behind the openclaw-acp `ExecuteJobResult` contract. Any update to the PQS pipeline lands here, not in the CLI repo.
+- `scripts/atlas-agent-resume.sh` — one-shot setup + buy driver. Walks through `acp setup` (browser-blocked), `acp sell init`, template copy, `acp sell create`, `acp serve start` in the background, and finally `acp job create` + poll + pay.
+- `src/grade-gate.ts` — reusable grade-gate logic (pre_score.total ≥ 60). Unit-tested via `npm test`. Used by the buyer to decide whether the AtlasRow deliverable was worth paying for.
+- `src/virtuals-client.ts`, `scripts/atlas-agent-{serve,buy,doctor}.ts`, `bin/atlas-agent.ts` — retained as a **reference implementation** of the raw-SDK path. They typecheck and can be invoked once Virtuals exposes a wallet-deploy step, but are not the live path.
+
+**Protocol flow via openclaw-acp:**
+
+1. Buyer: `acp job create <seller-wallet> pqs_atlas_score --requirements '{"prompt":"...","vertical":"software"}'` — creates a $0.10 USDC fixed-fee job.
+2. Seller runtime (`acp serve start`) receives the request, calls `validateRequirementsHandler` to reject malformed prompts early, then emits the payment request with the message from `requestPaymentHandler`.
+3. Buyer: `acp job pay <jobId> --accept true` — settles $0.10 USDC on Base mainnet via ACP's x402 route.
+4. Seller runtime calls `executeJobHandler` which runs `generateAtlasRow()` (pre-score + post-score + Opus 4.7 output). The AtlasRow JSON is delivered.
+5. Buyer applies `shouldPay` from `src/grade-gate.ts` client-side to audit whether the returned AtlasRow met the B+ gate; rejection → reputational signal, not a refund (payment already settled on-chain in step 3). This is a documented tradeoff of the openclaw-acp fixed-fee flow vs the raw-SDK `payAndAcceptRequirement` pattern.
+
+**CLI.** `scripts/atlas-agent-ship.sh` is the canonical driver. (Earlier
+`atlas-agent-resume.sh` is retained for reference; it had two bugs —
+bash-portable `read` syntax and underscore-vs-hyphen agent-slug derivation
+— that `atlas-agent-ship.sh` fixes.)
+
+```bash
+# One-time:
+git clone https://github.com/Virtual-Protocol/openclaw-acp ~/Desktop/openclaw-acp
+cd ~/Desktop/openclaw-acp && npm install && npm link
+acp setup                     # browser OAuth. Creates pqs-atlas-seller agent.
+acp agent create pqs-buyer    # second agent for the buyer side.
+
+# From pqs-atlas-agent repo root:
+./scripts/atlas-agent-ship.sh seller-up   # copy templates + sell create + serve
+./scripts/atlas-agent-ship.sh check       # on-chain balance check via Base RPC
+./scripts/atlas-agent-ship.sh buy "write a production-ready onboarding email for a B2B SaaS"
+./scripts/atlas-agent-ship.sh status      # active agent + serve + sell list + balances
+```
+
+Single-machine flip note: `acp agent switch` stops the seller runtime (the
+runtime is bound to the current agent's API key). The `buy` subcommand
+handles this automatically: stop-seller → switch-to-buyer → `acp job create
+--isAutomated true` → switch-back-to-seller → restart serve → poll until
+COMPLETED. `--isAutomated true` means the ACP server auto-accepts payment
+on the buyer's behalf when the seller emits the NEGOTIATION memo, so we
+don't need to flip back to the buyer for `acp job pay`.
+
+**Implementation note on payment semantics.** The raw brief described the pipeline prepaying PQS $0.025 via an existing x402 MCP tool, but the production pipeline uses a Bearer API key (`PQS_API_KEY`) that represents pre-funded PQS credit — there is no per-call x402 step on the seller side. The real on-chain USDC transaction captured by this integration is the buyer → seller settlement via Virtuals ACP's x402 route, which is what lands on Basescan.
+
+**Live proof of a completed buy.** Job `1003481624` executed end-to-end on Base mainnet (offering `pqs_atlas_score`, pre_score 15/80, post_score 47/60, deliverable emitted, phase=COMPLETED). Settlement is a two-tx flow through the ACP escrow contract (`0xef4364fe4487353df46eb7c811d4fac78b856c7f`):
+
+| Direction | Amount | Tx hash |
+|-----------|-------:|---------|
+| Buyer → escrow | 0.10 USDC | [`0x90faf432…87d7dc`](https://basescan.org/tx/0x90faf432bffd08b1eb4b7d5a9b4e760f94a42ec7b7faae7d0d83de848c87d7dc) |
+| Escrow → seller | 0.08 USDC | [`0x2af9ad30…3bce2efa`](https://basescan.org/tx/0x2af9ad30310f5c4711cb2703368c534853ce0a20a6b87f1b4f0925b93bce2efa) |
+
+The 0.02 USDC delta is Virtuals' 20% protocol fee retained by the escrow. Both txs confirmed in Base blocks 45043695 and 45043732 on 2026-04-24.
+
+**Edge case found during shipping (documented because judges may hit it).** `acp agent switch` kills the seller runtime, so the obvious "switch → create job → switch back" sequence orphans the new job — it lands server-side while the seller socket is offline and no `onNewTask` event is replayed on reconnect. Workaround: POST directly to `https://claw-api.virtuals.io/acp/jobs` with the buyer's `x-api-key` from `~/Desktop/openclaw-acp/config.json`. Seller stays up, job fires live through the socket, deliverable settles immediately. `atlas-agent-ship.sh`'s `buy` subcommand performs the flip-dance for convenience; the direct-API path is recommended for reliability and is the one used for the proven tx above.
 
 ## The scoring substrate
 
@@ -93,8 +155,8 @@ We used PQS to score the prompt we used to audit our own agent during the build.
 
 ## Roadmap (v2, not demoed)
 
-- Marketplace integration for the x402 rail via a Daydreams-style adapter: agents discover listings, score inbound prompts, route payments, act.
-- Full autonomous polling loop with persisted session state and an observable trace surface for judges or auditors.
+- Autonomous polling loop on top of the Virtuals ACP integration: agent self-selects inbound prompts, scores, routes payments, acts without CLI invocation.
+- Persisted session state and an observable trace surface for judges or auditors.
 - `marketplace-agent` Skill wrapping the discovery and action path.
 - `managed-agent-session` Skill wrapping durable multi-prompt sessions.
 

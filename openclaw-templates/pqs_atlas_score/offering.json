@@ -1,0 +1,31 @@
+{
+  "name": "pqs_atlas_score",
+  "description": "PQS AtlasRow for any prompt. Runs PQS pre-flight score (pre_score.total 0-80, grade A-F) + post-flight score + Opus 4.7 output, returned as a structured AtlasRow JSON. Buyers can grade-gate payment on pre_score.total >= 60 (B+).",
+  "jobFee": 0.1,
+  "jobFeeType": "fixed",
+  "requiredFunds": false,
+  "requirement": {
+    "type": "object",
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "description": "The prompt to score and execute. Min 8, max 8000 chars."
+      },
+      "vertical": {
+        "type": "string",
+        "description": "Optional vertical hint. One of the VALID_VERTICALS. Default: general.",
+        "enum": [
+          "software",
+          "content",
+          "business",
+          "education",
+          "science",
+          "crypto",
+          "general",
+          "research"
+        ]
+      }
+    },
+    "required": ["prompt"]
+  }
+}
