@@ -79,6 +79,17 @@ don't need to flip back to the buyer for `acp job pay`.
 
 **Implementation note on payment semantics.** The raw brief described the pipeline prepaying PQS $0.025 via an existing x402 MCP tool, but the production pipeline uses a Bearer API key (`PQS_API_KEY`) that represents pre-funded PQS credit — there is no per-call x402 step on the seller side. The real on-chain USDC transaction captured by this integration is the buyer → seller settlement via Virtuals ACP's x402 route, which is what lands on Basescan.
 
+**Live proof of a completed buy.** Job `1003481624` executed end-to-end on Base mainnet (offering `pqs_atlas_score`, pre_score 15/80, post_score 47/60, deliverable emitted, phase=COMPLETED). Settlement is a two-tx flow through the ACP escrow contract (`0xef4364fe4487353df46eb7c811d4fac78b856c7f`):
+
+| Direction | Amount | Tx hash |
+|-----------|-------:|---------|
+| Buyer → escrow | 0.10 USDC | [`0x90faf432…87d7dc`](https://basescan.org/tx/0x90faf432bffd08b1eb4b7d5a9b4e760f94a42ec7b7faae7d0d83de848c87d7dc) |
+| Escrow → seller | 0.08 USDC | [`0x2af9ad30…3bce2efa`](https://basescan.org/tx/0x2af9ad30310f5c4711cb2703368c534853ce0a20a6b87f1b4f0925b93bce2efa) |
+
+The 0.02 USDC delta is Virtuals' 20% protocol fee retained by the escrow. Both txs confirmed in Base blocks 45043695 and 45043732 on 2026-04-24.
+
+**Edge case found during shipping (documented because judges may hit it).** `acp agent switch` kills the seller runtime, so the obvious "switch → create job → switch back" sequence orphans the new job — it lands server-side while the seller socket is offline and no `onNewTask` event is replayed on reconnect. Workaround: POST directly to `https://claw-api.virtuals.io/acp/jobs` with the buyer's `x-api-key` from `~/Desktop/openclaw-acp/config.json`. Seller stays up, job fires live through the socket, deliverable settles immediately. `atlas-agent-ship.sh`'s `buy` subcommand performs the flip-dance for convenience; the direct-API path is recommended for reliability and is the one used for the proven tx above.
+
 ## The scoring substrate
 
 PQS grades any LLM prompt on eight dimensions: clarity, specificity, context, constraints, output format, role definition, examples, chain-of-thought structure. Each is scored 1-10. Total in [8, 80], grade cutoffs A≥70, B≥60, C≥50, D≥35, F<35. The rubric cites five academic frameworks (PEEM, RAGAS, MT-Bench, G-Eval, ROUGE).
