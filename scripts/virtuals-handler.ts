@@ -25,6 +25,23 @@
  * ../src/grade-gate.js. Handler itself does not gate — the buyer decides.
  */
 
+// ---------- env bootstrap ----------
+// The openclaw-acp seller runtime launches from ~/Desktop/openclaw-acp, not
+// this repo, so dotenv's default CWD lookup misses our .env.local. Load it
+// by absolute path derived from THIS file's location (import.meta.url).
+// PQS_API_KEY and PQS_INTERNAL_TOKEN are required by generate-atlas-row.
+import { config as dotenvConfig } from "dotenv";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+const __dirname_vh = dirname(fileURLToPath(import.meta.url));
+const __envPath_vh = resolve(__dirname_vh, "..", ".env.local");
+const __dotenvResult_vh = dotenvConfig({ path: __envPath_vh, override: true });
+console.log(
+  `[virtuals-handler] dotenv load from ${__envPath_vh}: ${
+    __dotenvResult_vh.error ? `ERROR ${__dotenvResult_vh.error.message}` : "OK"
+  }; PQS_API_KEY=${process.env.PQS_API_KEY ? "set" : "missing"}`,
+);
+
 import { generateAtlasRow } from "./generate-atlas-row.js";
 import { VALID_VERTICALS, type AtlasRow, type Vertical } from "../schemas/atlas-row.js";
 
