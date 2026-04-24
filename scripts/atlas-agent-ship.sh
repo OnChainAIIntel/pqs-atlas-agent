@@ -87,8 +87,17 @@ serve_start() {
     warn "serve already running — skipping start"
     return 0
   fi
-  ( cd "$OPENCLAW_ROOT" && nohup acp serve start > "$SERVE_LOG" 2>&1 & )
-  sleep 4
+  # Pre-export .env.local so the nohup'd seller subprocess inherits
+  # PQS_API_KEY/PQS_INTERNAL_TOKEN directly. Belt+suspenders vs the
+  # dotenv bootstrap in virtuals-handler.ts — if either works, the
+  # handler can call the PQS API.
+  ( cd "$OPENCLAW_ROOT" \
+      && set -a \
+      && . "${REPO_ROOT}/.env.local" \
+      && set +a \
+      && nohup acp serve start > "$SERVE_LOG" 2>&1 & )
+  # Serve spawns a grandchild; 4s was flaky. Give it 8s.
+  sleep 8
   if serve_running; then
     ok "serve started — log: $SERVE_LOG"
   else
