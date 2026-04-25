@@ -4,6 +4,17 @@ PQS as a scoring layer for AI prompts, deployed on two rails where economic valu
 
 Built for Anthropic's "Built with Opus 4.7" hackathon, April 21-26, 2026.
 
+## Findings
+
+Open research backing the Synapse hackathon submission (synapse.promptqualityscore.com).
+
+- **`findings/kappa-calibration.md`** — Inter-rater reliability across Opus 4.7, Sonnet, and GPT-4o on adversarial prompts. Headline result: Opus–Sonnet κ=0.79 (substantial agreement, Claude-family alignment); Opus–GPT4o κ=0.06 (slight, near-collapse on adversarial input).
+- **`findings/fb-lift-comparison.md`** — F→B Lift comparison between Opus 4.7 and Sonnet on PQS rewrites. Opus 4.7 mean lift +38.4 vs Sonnet +32.4 (n=5, directional).
+- **`findings/rubric-ceiling.md`** — Analysis of scoring ceiling effects.
+- **`fb-lift-opus.jsonl`** / **`fb-lift-sonnet.jsonl`** — Raw per-prompt experimental data for the F→B Lift comparison.
+
+These findings inform the design of [Synapse](https://synapse.promptqualityscore.com), our entry to Built with Opus 4.7 (Cerebral Valley × Anthropic, April 2026).
+
 ## The thesis
 
 Bad prompts are the root cause of AI underperformance wherever AI touches economic value, but the blame lands on models, orchestration, or tooling because the input is the one signal no one is measuring. A 20-row stratified sample across five public HuggingFace corpora (LMSYS, WildChat, OpenAssistant/oasst2, HuggingFaceH4/no_robots, Open-Orca/OpenOrca) scored 0/20 above F-grade on PQS's 8-dimension rubric, with the entire sample capped at 33 out of 80 (2 points below the D-grade floor). The prompts going into production are underspecified in the same way almost every time, and there is no grader between the human intent and the bill. PQS is the grader.
