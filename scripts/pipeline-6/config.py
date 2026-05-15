@@ -13,29 +13,26 @@ pull their per-dimension prompt text from OUTPUT_DIMENSION_DEFINITIONS so the
 two judges apply a byte-identical definition for any given dimension.
 
 ----------------------------------------------------------------------------
-NOTES ON DISCREPANCIES WITH REPO / PRODUCTION (read before first run)
+ALIGNMENT WITH CANONICAL OUTPUT RUBRIC (PR #73, prompt-optimization-engine)
 ----------------------------------------------------------------------------
-1. Directory: this pipeline lives under pipelines/pipeline-6/. Pipelines 4 and
-   5 live under scripts/pipeline-N/. Pipeline 6 was specced as a standalone
-   executor, hence the new top-level pipelines/ tree.
+Pipeline 6 is reconciled against the merged output-scoring refactor:
 
-2. Source corpus: SOURCE_CORPUS_PATH defaults to the spec path
-   pipelines/pipeline-4/outputs/source-corpus-software.jsonl. Pipeline 4's
-   actual deliverables currently sit under data/ (e.g.
-   data/source-prompts-clean-sampled.jsonl). Set PQS_SOURCE_CORPUS to point at
-   the real software-vertical corpus before running score_outputs.py.
+1. Directory: lives under scripts/pipeline-6/, matching the scripts/pipeline-N/
+   convention used by Pipelines 4 and 5.
 
-3. Dimension name: this rubric uses `specificity_of_claims`. The deployed
-   /api/atlas/score/output endpoint calls the same dimension `specificity`.
-   Pipeline 6's per-dim judge routing and atlas rows use `specificity_of_claims`
-   throughout; score_output_full() (the production-path full score, used for
-   observability only) returns whatever the endpoint returns.
+2. Source corpus: SOURCE_CORPUS_PATH defaults to
+   data/source-prompts-clean-deterministic.jsonl — the tracked 500-row
+   Pipeline 4 deliverable. Override with PQS_SOURCE_CORPUS to target a
+   different corpus without a code edit.
 
-4. Endpoints: ENDPOINT_OUTPUT_SCORE defaults to /api/score-output, which is
-   delivered by the prompt-optimization-engine Session A PR. Until that PR is
-   merged and deployed, set PQS_OUTPUT_SCORE_URL to a local dev URL
-   (http://localhost:3000/api/score-output). The deployed equivalent today is
-   /api/atlas/score/output.
+3. Dimension name: the post-flight rubric uses `specificity` — the canonical
+   name now locked across the deployed endpoint, lib/pqs-output-rubric.js, and
+   Pipeline 6.
+
+4. Endpoint: ENDPOINT_OUTPUT_SCORE defaults to /api/score-output, the internal
+   endpoint delivered by PR #73 (which imports its rubric from
+   lib/pqs-output-rubric.js). This is NOT /api/score/output, the separate
+   public paid endpoint. Override with PQS_OUTPUT_SCORE_URL for local dev.
 """
 from __future__ import annotations
 
@@ -44,7 +41,7 @@ from pathlib import Path
 
 # -----------------------------------------------------------------------------
 # Paths — ROOT is the pqs-atlas-agent repo root.
-# config.py -> pipeline-6 -> pipelines -> pqs-atlas-agent
+# config.py -> pipeline-6 -> scripts -> pqs-atlas-agent
 # -----------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -52,11 +49,11 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 # the pipeline can target the real corpus location and a scratch output file.
 SOURCE_CORPUS_PATH = os.getenv(
     "PQS_SOURCE_CORPUS",
-    "pipelines/pipeline-4/outputs/source-corpus-software.jsonl",
+    "data/source-prompts-clean-deterministic.jsonl",
 )
 OUTPUT_PATH = os.getenv(
     "PQS_ATLAS_OUTPUT",
-    "pipelines/pipeline-6/outputs/atlas-software.jsonl",
+    "scripts/pipeline-6/outputs/atlas-software.jsonl",
 )
 
 # Resolved absolute paths (use these for I/O; the strings above are the
@@ -64,16 +61,16 @@ OUTPUT_PATH = os.getenv(
 SOURCE_CORPUS_ABS = (ROOT / SOURCE_CORPUS_PATH).resolve()
 OUTPUT_ABS = (ROOT / OUTPUT_PATH).resolve()
 
-KAPPA_REPORT_PATH = ROOT / "pipelines" / "pipeline-6" / "outputs" / "kappa-phase-0.md"
+KAPPA_REPORT_PATH = ROOT / "scripts" / "pipeline-6" / "outputs" / "kappa-phase-0.md"
 CORRELATION_REPORT_PATH = ROOT / "findings" / "output-correlation.md"
 
 # -----------------------------------------------------------------------------
 # Endpoints — PQS scoring services. All overridable via env.
-# Internal calls send Authorization: Bearer <PQS_INTERNAL_BEARER> which both
+# Internal calls send Authorization: Bearer <PQS_INTERNAL_TOKEN> which both
 # bypasses the x402 paywall on /api/score and authenticates the internal-only
-# /api/score-output endpoint. PQS_INTERNAL_TOKEN, when set, is additionally
-# sent as the X-PQS-Internal observability flag (is_internal=true in
-# pqs_api_calls) so atlas traffic does not pollute customer usage analytics.
+# /api/score-output endpoint. The same PQS_INTERNAL_TOKEN is also sent as the
+# X-PQS-Internal observability flag (is_internal=true in pqs_api_calls) so
+# atlas traffic does not pollute customer usage analytics.
 # -----------------------------------------------------------------------------
 ENDPOINT_PROMPT_SCORE = os.getenv("PQS_PROMPT_SCORE_URL", "https://pqs.onchainintel.net/api/score")
 ENDPOINT_OUTPUT_SCORE = os.getenv("PQS_OUTPUT_SCORE_URL", "https://pqs.onchainintel.net/api/score-output")
@@ -110,7 +107,7 @@ JUDGE_CONFIG = {
     "factual_grounding":     "haiku",
     "instruction_adherence": "local",
     "coherence":             "local",
-    "specificity_of_claims": "local",
+    "specificity":           "local",
     "verifiability":         "local",
     "hallucination_risk":    "haiku",
 }
@@ -120,7 +117,7 @@ OUTPUT_DIMENSIONS = (
     "factual_grounding",
     "instruction_adherence",
     "coherence",
-    "specificity_of_claims",
+    "specificity",
     "verifiability",
     "hallucination_risk",
 )
@@ -129,7 +126,7 @@ OUTPUT_DIMENSIONS = (
 STRUCTURAL_DIMENSIONS = (
     "instruction_adherence",
     "coherence",
-    "specificity_of_claims",
+    "specificity",
     "verifiability",
 )
 
@@ -140,9 +137,10 @@ assert set(STRUCTURAL_DIMENSIONS).issubset(set(OUTPUT_DIMENSIONS))
 # The 6-dimension post-flight rubric.
 #
 # Each definition is a self-contained instruction for a judge scoring ONLY that
-# dimension on an integer 1-10 scale. Adapted from the judge system prompt in
-# prompt-optimization-engine/app/api/atlas/score/output/route.js so the local
-# and cloud judges stay aligned with the production output-quality rubric.
+# dimension on an integer 1-10 scale. Adapted from the canonical output-quality
+# rubric in prompt-optimization-engine/lib/pqs-output-rubric.js (the shared
+# source the deployed /api/score-output endpoint imports) so the local and
+# cloud judges stay aligned with production.
 # -----------------------------------------------------------------------------
 OUTPUT_DIMENSION_DEFINITIONS = {
     "factual_grounding":
@@ -157,7 +155,7 @@ OUTPUT_DIMENSION_DEFINITIONS = {
         "Is the output logically coherent, well-structured, and internally "
         "consistent? 10 = highly coherent with a clear structure; 1 = "
         "incoherent or self-contradictory.",
-    "specificity_of_claims":
+    "specificity":
         "Are the claims in the output specific and concrete rather than vague "
         "or generic? 10 = precise, detailed, concrete claims; 1 = vague, "
         "hand-wavy, generic statements.",
@@ -217,18 +215,18 @@ def output_grade_from_total(total: int) -> str:
 
 
 def internal_bearer() -> str:
-    """The PQS internal bearer token. Sent as Authorization: Bearer <token>."""
-    tok = os.environ.get("PQS_INTERNAL_BEARER")
+    """The PQS internal token. Sent as Authorization: Bearer <token>."""
+    tok = os.environ.get("PQS_INTERNAL_TOKEN")
     if not tok:
         raise RuntimeError(
-            "PQS_INTERNAL_BEARER not set — required to call /api/score and "
-            "/api/score-output. See pipelines/pipeline-6/README.md."
+            "PQS_INTERNAL_TOKEN not set — required to call /api/score and "
+            "/api/score-output. See scripts/pipeline-6/README.md."
         )
     return tok
 
 
 def internal_flag_header() -> dict:
-    """Optional X-PQS-Internal observability header, if PQS_INTERNAL_TOKEN is set."""
+    """X-PQS-Internal observability header carrying the internal token."""
     tok = os.environ.get("PQS_INTERNAL_TOKEN")
     return {"X-PQS-Internal": tok} if tok else {}
 

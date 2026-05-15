@@ -1,7 +1,7 @@
 # Pipeline 6 — Output-Scoring Atlas Executor
 
 Generates the PQS output-scoring atlas: for each prompt in the Pipeline 4
-software source corpus, score the prompt (8-dim pre-flight), generate an
+source corpus, score the prompt (8-dim pre-flight), generate an
 output with Haiku 4.5, score that output on the 6-dimension post-flight
 rubric, and write one atlas row per prompt to JSONL.
 
@@ -30,53 +30,52 @@ headline correlation number.
 
 ## Prerequisites
 
-1. **Session A endpoint deployed.** Pipeline 6's full `/api/score-output` path
-   depends on the `prompt-optimization-engine` Session A PR being merged and
-   deployed. Until then, point `PQS_OUTPUT_SCORE_URL` at a local dev URL
-   (`http://localhost:3000/api/score-output`). Note: `score_output_full()` is
-   used for observability only — atlas rows do **not** depend on this endpoint
-   (per-dimension judge attribution comes from the direct judge calls).
-2. **`PQS_INTERNAL_BEARER`** set — the internal PQS API key sent as
+1. **Output-scoring endpoint deployed.** Pipeline 6's full `/api/score-output`
+   path is delivered by `prompt-optimization-engine` PR #73 (merged), which
+   imports its rubric from `lib/pqs-output-rubric.js`. For local dev, point
+   `PQS_OUTPUT_SCORE_URL` at `http://localhost:3000/api/score-output`. Note:
+   `score_output_full()` is used for observability only — atlas rows do **not**
+   depend on this endpoint (per-dimension judge attribution comes from the
+   direct judge calls).
+2. **`PQS_INTERNAL_TOKEN`** set — the internal PQS token sent as
    `Authorization: Bearer <token>`. Bypasses the x402 paywall on `/api/score`
-   and authenticates the internal `/api/score-output` endpoint.
+   and authenticates the internal `/api/score-output` endpoint. The same token
+   is sent as the `X-PQS-Internal` observability flag.
 3. **`ANTHROPIC_API_KEY`** set — for the Haiku 4.5 generator and cloud judge.
 4. **Ollama running on CRYPTOMINER** at `OLLAMA_HOST` (default
    `http://192.168.1.205:11434`) with `gemma2:9b` pulled (`ollama pull gemma2:9b`).
-5. **Python deps:** `pip install -r pipelines/pipeline-6/requirements.txt`
+5. **Python deps:** `pip install -r scripts/pipeline-6/requirements.txt`
    (`anthropic`, `scikit-learn`, `scipy`).
 
 Set environment variables in a repo-root `.env.atlas` file (see
-`.env.atlas.example`) or export them directly. Optionally set
-`PQS_INTERNAL_TOKEN` — when present it is sent as the `X-PQS-Internal`
-observability header so atlas traffic is flagged `is_internal=true` in
-`pqs_api_calls`.
+`.env.atlas.example`) or export them directly. `PQS_INTERNAL_TOKEN` is also
+sent as the `X-PQS-Internal` observability header so atlas traffic is flagged
+`is_internal=true` in `pqs_api_calls`.
 
 ### Configurable env vars
 
 | Var | Default | Purpose |
 |---|---|---|
-| `PQS_INTERNAL_BEARER` | — (required) | Bearer token for `/api/score` + `/api/score-output` |
+| `PQS_INTERNAL_TOKEN` | — (required) | Bearer token for `/api/score` + `/api/score-output`; also sent as the `X-PQS-Internal` observability flag |
 | `ANTHROPIC_API_KEY` | — (required) | Haiku generator + cloud judge |
 | `PQS_PROMPT_SCORE_URL` | `https://pqs.onchainintel.net/api/score` | Pre-flight prompt scoring |
 | `PQS_OUTPUT_SCORE_URL` | `https://pqs.onchainintel.net/api/score-output` | Full output scoring (observability) |
 | `OLLAMA_HOST` | `http://192.168.1.205:11434` | CRYPTOMINER Ollama host |
 | `OLLAMA_MODEL` | `gemma2:9b` | Local judge model |
-| `PQS_SOURCE_CORPUS` | `pipelines/pipeline-4/outputs/source-corpus-software.jsonl` | Input corpus |
-| `PQS_ATLAS_OUTPUT` | `pipelines/pipeline-6/outputs/atlas-software.jsonl` | Atlas output |
-| `PQS_INTERNAL_TOKEN` | — (optional) | `X-PQS-Internal` observability flag |
+| `PQS_SOURCE_CORPUS` | `data/source-prompts-clean-deterministic.jsonl` | Input corpus |
+| `PQS_ATLAS_OUTPUT` | `scripts/pipeline-6/outputs/atlas-software.jsonl` | Atlas output |
 
-> **Source corpus note.** The default `PQS_SOURCE_CORPUS` is the spec path.
-> Pipeline 4's current deliverables sit under `data/` (e.g.
-> `data/source-prompts-clean-sampled.jsonl`). Set `PQS_SOURCE_CORPUS` to the
-> real software-vertical corpus before running.
+> **Source corpus note.** `PQS_SOURCE_CORPUS` defaults to
+> `data/source-prompts-clean-deterministic.jsonl` — the tracked 500-row
+> Pipeline 4 deliverable. Override it to target a different corpus.
 
 ## Execution order
 
 ```
-1. python pipelines/pipeline-6/kappa_phase_0.py     # Phase 0 calibration
+1. python scripts/pipeline-6/kappa_phase_0.py       # Phase 0 calibration
 2. (Ken reviews outputs/kappa-phase-0.md)           # amend JUDGE_CONFIG if FAIL
-3. python pipelines/pipeline-6/score_outputs.py     # build the atlas
-4. python pipelines/pipeline-6/correlation.py       # post-run analysis
+3. python scripts/pipeline-6/score_outputs.py       # build the atlas
+4. python scripts/pipeline-6/correlation.py         # post-run analysis
 ```
 
 Run every script from the repo root.
@@ -133,9 +132,9 @@ Both executors are resumable — re-run the same command:
 
 ```json
 {
-  "prompt_id": "string",
-  "prompt_text": "string",
-  "vertical": "software",
+  "prompt_id": "string (= source_row_id)",
+  "prompt_text": "string (= prompt)",
+  "vertical": "string (= vertical_source_label)",
   "generator_model": "claude-haiku-4-5-20251001",
   "output_text": "string",
   "prompt_score": { "total": 0, "out_of": 80, "grade": "A", "dimensions": {} },
@@ -144,9 +143,20 @@ Both executors are resumable — re-run the same command:
     "dimensions": { "<dim>": { "score": 0, "reasoning": "", "judge_model": "" } }
   },
   "timestamp": "ISO-8601",
-  "pipeline_version": "pipeline-6-v1.0"
+  "pipeline_version": "pipeline-6-v1.0",
+  "provenance": {
+    "source_dataset": "string",
+    "source_split": "string",
+    "quality_bucket": "string",
+    "word_count": 0,
+    "license_flag": "string",
+    "sampling_method": "string",
+    "sampling_seed": 0
+  }
 }
 ```
 
-Rows where the generator refuses carry `output_score: null` and a
-`skipped_reason` field so they stay auditable; `correlation.py` excludes them.
+`provenance` carries the Pipeline 4 corpus columns straight through for
+downstream analysis. Rows where the generator refuses carry `output_score:
+null` and a `skipped_reason` field so they stay auditable; `correlation.py`
+excludes them.

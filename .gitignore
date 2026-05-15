@@ -63,5 +63,5 @@ data/atlas-failures.jsonl
 # tracked; generated atlas/kappa files are not (final datasets get committed
 # separately once reviewed — force-add them).
 .env.atlas
-pipelines/pipeline-6/outputs/*
-!pipelines/pipeline-6/outputs/.gitkeep
+scripts/pipeline-6/outputs/*
+!scripts/pipeline-6/outputs/.gitkeep

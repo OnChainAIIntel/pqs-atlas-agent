@@ -3,7 +3,7 @@ Pipeline 6 — local judge: Ollama Gemma 4 9B (gemma2:9b) scoring a single
 post-flight dimension at a time.
 
 The local judge handles the 4 structural dimensions (instruction_adherence,
-coherence, specificity_of_claims, verifiability) — provided Phase 0 kappa
+coherence, specificity, verifiability) — provided Phase 0 kappa
 calibration confirms it agrees with Haiku. Each call scores ONE dimension so
 the judge sees only that dimension's definition; this keeps the per-dim score
 attributable and matches how cloud_judge.score_dimension_haiku() works.

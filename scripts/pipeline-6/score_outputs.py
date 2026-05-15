@@ -54,7 +54,7 @@ from local_judge import score_dimension_local
 
 # -----------------------------------------------------------------------------
 # Env loading — load a repo-root .env.atlas if present, then leave the rest of
-# the environment as-is. Required keys: ANTHROPIC_API_KEY, PQS_INTERNAL_BEARER.
+# the environment as-is. Required keys: ANTHROPIC_API_KEY, PQS_INTERNAL_TOKEN.
 # -----------------------------------------------------------------------------
 def load_env() -> None:
     env_path = ROOT / ".env.atlas"
@@ -68,12 +68,12 @@ def load_env() -> None:
             if k and not os.environ.get(k):
                 os.environ[k] = v
 
-    missing = [k for k in ("ANTHROPIC_API_KEY", "PQS_INTERNAL_BEARER")
+    missing = [k for k in ("ANTHROPIC_API_KEY", "PQS_INTERNAL_TOKEN")
                if not os.environ.get(k)]
     if missing:
         raise SystemExit(
             f"missing required env keys: {missing} — set them in {env_path} "
-            f"or the environment. See pipelines/pipeline-6/README.md."
+            f"or the environment. See scripts/pipeline-6/README.md."
         )
 
 
@@ -81,23 +81,42 @@ def load_env() -> None:
 # Corpus reading. Shared with kappa_phase_0.py.
 # -----------------------------------------------------------------------------
 def normalize_row(raw: dict, line_no: int) -> dict:
-    """Normalize a source-corpus row to {prompt_id, prompt_text, vertical}.
+    """Map a Pipeline 4 source-corpus row to Pipeline 6's internal row shape.
 
-    Source rows (Pipeline 4) carry `prompt` plus provenance fields. A stable
-    prompt_id is taken from `prompt_id` if present, else `source_row_id`, else
-    a synthetic line-based id.
+    Pipeline 4 corpus rows carry `prompt` plus a `source_row_id` (unique within
+    the corpus file) and a set of provenance fields. The mapping is:
+
+      prompt_id   <- source_row_id   (already unique; the corpus is one dataset
+                                      per file, so no compositing is needed)
+      prompt_text <- prompt
+      vertical    <- vertical_source_label
+
+    The remaining provenance fields (source_dataset, source_split,
+    quality_bucket, word_count, license_flag, sampling_method, sampling_seed)
+    pass straight through under `provenance` so they reach the atlas rows for
+    downstream analysis. Fallbacks to legacy key names are kept for robustness.
     """
     prompt_text = raw.get("prompt") or raw.get("prompt_text") or ""
     prompt_id = (
-        raw.get("prompt_id")
-        or raw.get("source_row_id")
+        raw.get("source_row_id")
+        or raw.get("prompt_id")
         or f"corpus-line-{line_no}"
     )
-    vertical = raw.get("vertical") or raw.get("vertical_source_label") or "software"
+    vertical = raw.get("vertical_source_label") or raw.get("vertical") or "software"
+    provenance = {
+        "source_dataset":  raw.get("source_dataset"),
+        "source_split":    raw.get("source_split"),
+        "quality_bucket":  raw.get("quality_bucket"),
+        "word_count":      raw.get("word_count"),
+        "license_flag":    raw.get("license_flag"),
+        "sampling_method": raw.get("sampling_method"),
+        "sampling_seed":   raw.get("sampling_seed"),
+    }
     return {
         "prompt_id": str(prompt_id),
         "prompt_text": prompt_text,
         "vertical": str(vertical),
+        "provenance": provenance,
     }
 
 
@@ -106,8 +125,8 @@ def read_corpus(path: Path = SOURCE_CORPUS_ABS, limit: int | None = None) -> lis
     if not path.exists():
         raise SystemExit(
             f"source corpus not found: {path}\n"
-            f"Set PQS_SOURCE_CORPUS to the software-vertical corpus path. "
-            f"See pipelines/pipeline-6/README.md."
+            f"Set PQS_SOURCE_CORPUS to the source corpus path. "
+            f"See scripts/pipeline-6/README.md."
         )
     rows: list[dict] = []
     for i, line in enumerate(path.read_text().splitlines()):
@@ -242,6 +261,7 @@ def process_prompt(row: dict) -> dict:
             "skipped_reason": "generator_refusal_or_empty",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "pipeline_version": PIPELINE_VERSION,
+            "provenance": row["provenance"],
         }
 
     output_text = gen["text"]
@@ -257,6 +277,7 @@ def process_prompt(row: dict) -> dict:
         "output_score": output_score,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "pipeline_version": PIPELINE_VERSION,
+        "provenance": row["provenance"],
     }
 
 

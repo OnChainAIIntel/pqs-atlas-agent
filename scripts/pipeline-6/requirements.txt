@@ -1,5 +1,5 @@
 # Pipeline 6 — output-scoring atlas executor.
-# Install: pip install -r pipelines/pipeline-6/requirements.txt
+# Install: pip install -r scripts/pipeline-6/requirements.txt
 #
 # The Ollama local judge is reached over the HTTP API directly (urllib) — no
 # ollama python client is needed.
