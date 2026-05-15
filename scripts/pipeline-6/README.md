@@ -37,26 +37,28 @@ headline correlation number.
    `score_output_full()` is used for observability only — atlas rows do **not**
    depend on this endpoint (per-dimension judge attribution comes from the
    direct judge calls).
-2. **`PQS_INTERNAL_TOKEN`** set — the internal PQS token sent as
-   `Authorization: Bearer <token>`. Bypasses the x402 paywall on `/api/score`
-   and authenticates the internal `/api/score-output` endpoint. The same token
-   is sent as the `X-PQS-Internal` observability flag.
+2. **`PQS_INTERNAL_BYPASS_KEY`** set — the internal bypass key sent as the
+   single `x-pqs-internal-bypass` header. Production `middleware.js` validates
+   it against the `PQS_PARTNER_BYPASS_KEYS` partner-key registry (with
+   `PQS_INTERNAL_BYPASS_KEY` as the legacy single-key fallback); on a match it
+   sets `x-pqs-bypass-verified`, which the route handler reads to skip the x402
+   paywall on `/api/score` and admit the internal `/api/score-output` endpoint.
 3. **`ANTHROPIC_API_KEY`** set — for the Haiku 4.5 generator and cloud judge.
 4. **Ollama running on CRYPTOMINER** at `OLLAMA_HOST` (default
    `http://192.168.1.205:11434`) with `gemma2:9b` pulled (`ollama pull gemma2:9b`).
 5. **Python deps:** `pip install -r scripts/pipeline-6/requirements.txt`
    (`anthropic`, `scikit-learn`, `scipy`).
 
-Set environment variables in a repo-root `.env.atlas` file (see
-`.env.atlas.example`) or export them directly. `PQS_INTERNAL_TOKEN` is also
-sent as the `X-PQS-Internal` observability header so atlas traffic is flagged
-`is_internal=true` in `pqs_api_calls`.
+Set environment variables in a repo-root `.env.atlas` file or export them
+directly. `PQS_INTERNAL_BYPASS_KEY` is sent as the `x-pqs-internal-bypass`
+header; `middleware.js` validates it against the partner-key registry and, on a
+match, admits the request past the x402 paywall.
 
 ### Configurable env vars
 
 | Var | Default | Purpose |
 |---|---|---|
-| `PQS_INTERNAL_TOKEN` | — (required) | Bearer token for `/api/score` + `/api/score-output`; also sent as the `X-PQS-Internal` observability flag |
+| `PQS_INTERNAL_BYPASS_KEY` | — (required) | Bypass key sent as `x-pqs-internal-bypass` header; middleware validates against `PQS_PARTNER_BYPASS_KEYS` registry or legacy `PQS_INTERNAL_BYPASS_KEY` env var |
 | `ANTHROPIC_API_KEY` | — (required) | Haiku generator + cloud judge |
 | `PQS_PROMPT_SCORE_URL` | `https://pqs.onchainintel.net/api/score` | Pre-flight prompt scoring |
 | `PQS_OUTPUT_SCORE_URL` | `https://pqs.onchainintel.net/api/score-output` | Full output scoring (observability) |

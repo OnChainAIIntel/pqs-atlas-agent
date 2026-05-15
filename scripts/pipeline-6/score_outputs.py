@@ -44,8 +44,7 @@ from config import (
     RETRY_BASE_SEC,
     ROOT,
     SOURCE_CORPUS_ABS,
-    internal_bearer,
-    internal_flag_header,
+    internal_bypass_headers,
     output_grade_from_total,
 )
 from cloud_judge import generate_output, score_dimension_haiku
@@ -54,7 +53,7 @@ from local_judge import score_dimension_local
 
 # -----------------------------------------------------------------------------
 # Env loading — load a repo-root .env.atlas if present, then leave the rest of
-# the environment as-is. Required keys: ANTHROPIC_API_KEY, PQS_INTERNAL_TOKEN.
+# the environment as-is. Required keys: ANTHROPIC_API_KEY, PQS_INTERNAL_BYPASS_KEY.
 # -----------------------------------------------------------------------------
 def load_env() -> None:
     env_path = ROOT / ".env.atlas"
@@ -68,7 +67,7 @@ def load_env() -> None:
             if k and not os.environ.get(k):
                 os.environ[k] = v
 
-    missing = [k for k in ("ANTHROPIC_API_KEY", "PQS_INTERNAL_TOKEN")
+    missing = [k for k in ("ANTHROPIC_API_KEY", "PQS_INTERNAL_BYPASS_KEY")
                if not os.environ.get(k)]
     if missing:
         raise SystemExit(
@@ -154,8 +153,7 @@ def score_prompt(prompt: str, vertical: str) -> dict:
     body = json.dumps({"prompt": prompt, "vertical": vertical}).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {internal_bearer()}",
-        **internal_flag_header(),
+        **internal_bypass_headers(),
     }
 
     last_exc: Exception | None = None

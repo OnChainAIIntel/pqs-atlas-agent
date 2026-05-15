@@ -66,11 +66,13 @@ CORRELATION_REPORT_PATH = ROOT / "findings" / "output-correlation.md"
 
 # -----------------------------------------------------------------------------
 # Endpoints — PQS scoring services. All overridable via env.
-# Internal calls send Authorization: Bearer <PQS_INTERNAL_TOKEN> which both
-# bypasses the x402 paywall on /api/score and authenticates the internal-only
-# /api/score-output endpoint. The same PQS_INTERNAL_TOKEN is also sent as the
-# X-PQS-Internal observability flag (is_internal=true in pqs_api_calls) so
-# atlas traffic does not pollute customer usage analytics.
+# Internal calls send a single x-pqs-internal-bypass: <PQS_INTERNAL_BYPASS_KEY>
+# header. Production middleware.js validates this key against the
+# PQS_PARTNER_BYPASS_KEYS partner-key registry (with PQS_INTERNAL_BYPASS_KEY as
+# the legacy single-key fallback); on a match it sets x-pqs-bypass-verified=1
+# and the route handler reads THAT to skip the x402 paywall on /api/score and
+# admit the internal-only /api/score-output endpoint. Pipeline 6 only sends the
+# bypass key — it never sets the verified header itself; middleware does.
 # -----------------------------------------------------------------------------
 ENDPOINT_PROMPT_SCORE = os.getenv("PQS_PROMPT_SCORE_URL", "https://pqs.onchainintel.net/api/score")
 ENDPOINT_OUTPUT_SCORE = os.getenv("PQS_OUTPUT_SCORE_URL", "https://pqs.onchainintel.net/api/score-output")
@@ -214,21 +216,26 @@ def output_grade_from_total(total: int) -> str:
     return "F"
 
 
-def internal_bearer() -> str:
-    """The PQS internal token. Sent as Authorization: Bearer <token>."""
-    tok = os.environ.get("PQS_INTERNAL_TOKEN")
+def internal_bypass_key() -> str:
+    """The PQS internal bypass key. Sent as the x-pqs-internal-bypass header;
+    middleware.js validates it against the partner-key registry."""
+    tok = os.environ.get("PQS_INTERNAL_BYPASS_KEY")
     if not tok:
         raise RuntimeError(
-            "PQS_INTERNAL_TOKEN not set — required to call /api/score and "
-            "/api/score-output. See scripts/pipeline-6/README.md."
+            "PQS_INTERNAL_BYPASS_KEY not set — required for /api/score and "
+            "/api/score-output internal bypass (middleware validates against "
+            "PQS_PARTNER_BYPASS_KEYS registry or legacy PQS_INTERNAL_BYPASS_KEY "
+            "env var). See scripts/pipeline-6/README.md."
         )
     return tok
 
 
-def internal_flag_header() -> dict:
-    """X-PQS-Internal observability header carrying the internal token."""
-    tok = os.environ.get("PQS_INTERNAL_TOKEN")
-    return {"X-PQS-Internal": tok} if tok else {}
+def internal_bypass_headers() -> dict:
+    """The x-pqs-internal-bypass request header carrying the internal bypass
+    key. Middleware validates the key and, on a match, sets x-pqs-bypass-verified
+    so the route handler skips x402 — Pipeline 6 sends only the bypass key."""
+    tok = os.environ.get("PQS_INTERNAL_BYPASS_KEY")
+    return {"x-pqs-internal-bypass": tok} if tok else {}
 
 
 if __name__ == "__main__":

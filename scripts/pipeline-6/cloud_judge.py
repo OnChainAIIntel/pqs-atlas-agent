@@ -46,8 +46,7 @@ from config import (
     OUTPUT_DIMENSION_DEFINITIONS,
     REQUEST_TIMEOUT_SEC,
     RETRY_BASE_SEC,
-    internal_bearer,
-    internal_flag_header,
+    internal_bypass_headers,
 )
 
 # Haiku 4.5 pricing per million tokens (USD) — SOP_PROMPT_CACHING table.
@@ -262,8 +261,7 @@ def score_output_full(prompt: str, output: str, vertical: str) -> dict:
 
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {internal_bearer()}",
-        **internal_flag_header(),
+        **internal_bypass_headers(),
     }
 
     last_exc: Exception | None = None
