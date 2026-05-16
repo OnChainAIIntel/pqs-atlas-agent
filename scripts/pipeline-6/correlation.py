@@ -104,8 +104,8 @@ def main() -> None:
     per_grade = _per_grade_means(scored)
     matrix = _grade_transition_matrix(scored)
 
-    # Headline. Vertical is uniform across the software corpus; report it.
-    vertical = scored[0].get("vertical", "software")
+    # Headline. Report the vertical of the first row as a representative label.
+    vertical = scored[0].get("vertical", "general")
     headline = (
         f"Across n={n} {vertical} prompts, PQS pre-flight score correlates "
         f"with output quality at Pearson r={pearson_r}, Spearman "

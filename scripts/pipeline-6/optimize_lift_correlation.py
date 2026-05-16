@@ -170,7 +170,7 @@ def main() -> None:
         "This atlas tests the PQS product thesis directly: does running a "
         "prompt through the PQS optimize transform produce a better OUTPUT? "
         "The original output and its score are reused from the first atlas "
-        "(`atlas-software.jsonl`); the optimized prompt and output come from "
+        "(`atlas-general.jsonl`); the optimized prompt and output come from "
         "`/api/score/full`, and the optimized output is scored by "
         "`/api/score-output`."
     )
