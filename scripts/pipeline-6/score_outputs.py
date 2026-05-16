@@ -1,7 +1,7 @@
 """
 Pipeline 6 — main executor: build the output-scoring atlas.
 
-For each prompt in the Pipeline 4 software source corpus:
+For each prompt in the Pipeline 4 source corpus:
   1. POST to /api/score          -> 8-dim pre-flight prompt_score
   2. generate an output          -> Haiku 4.5 generator
   3. score the output on 6 dims  -> routed per JUDGE_CONFIG (local Gemma /
@@ -104,7 +104,7 @@ def normalize_row(raw: dict, line_no: int) -> dict:
         or raw.get("prompt_id")
         or f"corpus-line-{line_no}"
     )
-    vertical = raw.get("vertical_source_label") or raw.get("vertical") or "software"
+    vertical = raw.get("vertical_source_label") or raw.get("vertical") or "general"
     provenance = {
         "source_dataset":  raw.get("source_dataset"),
         "source_split":    raw.get("source_split"),

@@ -75,7 +75,7 @@ path — `PQS_API_KEY` sent as `Authorization: Bearer`, validated against the
 | `OLLAMA_HOST` | `http://192.168.1.205:11434` | CRYPTOMINER Ollama host |
 | `OLLAMA_MODEL` | `gemma2:9b` | Local judge model |
 | `PQS_SOURCE_CORPUS` | `data/source-prompts-clean-deterministic.jsonl` | Input corpus |
-| `PQS_ATLAS_OUTPUT` | `scripts/pipeline-6/outputs/atlas-software.jsonl` | Atlas output |
+| `PQS_ATLAS_OUTPUT` | `scripts/pipeline-6/outputs/atlas-general.jsonl` | Atlas output |
 
 > **Source corpus note.** `PQS_SOURCE_CORPUS` defaults to
 > `data/source-prompts-clean-deterministic.jsonl` — the tracked 500-row
@@ -102,7 +102,7 @@ and set each failed dimension to `"haiku"`, then re-run nothing — proceed to
 step 3. If Phase 0 exits 0, no change is needed.
 
 **Step 3 — build the atlas.** Scores all 500 prompts and writes atlas rows to
-`outputs/atlas-software.jsonl`.
+`outputs/atlas-general.jsonl`.
 
 **Step 4 — analysis.** Computes the prompt-score ↔ output-score correlation
 and writes `findings/output-correlation.md` with the headline number.
@@ -127,18 +127,24 @@ Both executors are resumable — re-run the same command:
   `outputs/kappa-phase-0-raw.jsonl`. A re-run reuses cached prompts and only
   scores the rest, then recomputes kappa over the full set.
 - `score_outputs.py` skips any `prompt_id` already present in
-  `outputs/atlas-software.jsonl`. A re-run only processes the remainder.
+  `outputs/atlas-general.jsonl`. A re-run only processes the remainder.
   Failed prompts within a batch are logged and left for the next run.
 
 ## Output / where the dataset publishes
 
 - `outputs/kappa-phase-0.md` — Phase 0 calibration report (committed after the
   first run for review).
-- `outputs/atlas-software.jsonl` — the atlas dataset. Generated output;
+- `outputs/atlas-general.jsonl` — the atlas dataset. Generated output;
   gitignored by default. The selected final dataset is committed separately
   once a run is reviewed — link it here after the first successful run.
 - `findings/output-correlation.md` — the correlation analysis and headline
   number.
+
+> **Note:** Any files matching the `atlas-software*.jsonl` pattern (plus the
+> `kappa-phase-0*` and `atlas-optimize-lift*` artifacts derived from them) are
+> software-vertical-contaminated baselines from runs that defaulted
+> None-labeled prompts to `vertical='software'`. They are retained for
+> reference only. The corrected rerun produces `atlas-general.jsonl`.
 
 ### Atlas row schema
 
@@ -190,7 +196,7 @@ prompt through PQS optimization produce a better output?**
 
 ### What it measures
 
-For every prompt in the first atlas (`outputs/atlas-software.jsonl`):
+For every prompt in the first atlas (`outputs/atlas-general.jsonl`):
 
 1. POST the original prompt to **`/api/score/full`** (`x-pqs-internal-bypass`
    auth). The endpoint returns the original prompt + score + output **and** the
@@ -221,7 +227,7 @@ lift — they are skipped, logged, and counted, never written as a row.
 ```
 
 Run both from the repo root, after `score_outputs.py` has produced
-`outputs/atlas-software.jsonl`. The executor is resumable — `prompt_id`s
+`outputs/atlas-general.jsonl`. The executor is resumable — `prompt_id`s
 already present in `outputs/atlas-optimize-lift.jsonl` are skipped on re-run,
 and failed prompts are logged and left for the next run. Prompts are processed
 in parallel batches of `BATCH_SIZE` (10).

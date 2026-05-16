@@ -53,7 +53,7 @@ SOURCE_CORPUS_PATH = os.getenv(
 )
 OUTPUT_PATH = os.getenv(
     "PQS_ATLAS_OUTPUT",
-    "scripts/pipeline-6/outputs/atlas-software.jsonl",
+    "scripts/pipeline-6/outputs/atlas-general.jsonl",
 )
 
 # Resolved absolute paths (use these for I/O; the strings above are the

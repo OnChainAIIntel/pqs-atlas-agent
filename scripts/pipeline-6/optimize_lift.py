@@ -7,7 +7,7 @@ not about PQS. PQS's actual product is the OPTIMIZE TRANSFORM. This pipeline
 tests the product thesis directly: does running a prompt through PQS
 optimization produce a better OUTPUT?
 
-For every prompt in the first atlas (outputs/atlas-software.jsonl):
+For every prompt in the first atlas (outputs/atlas-general.jsonl):
   1. POST the original prompt to /api/score/full (x-pqs-internal-bypass auth).
      The endpoint returns the original prompt + score + output AND the
      Sonnet-4.6-rewritten optimized prompt + score + output (both outputs
@@ -29,7 +29,7 @@ Prompts are processed in parallel batches of BATCH_SIZE. First-atlas rows whose
 output_score is null (generator refused in the first atlas) cannot yield an
 output_lift and are skipped, logged, and counted — never written as a row.
 
-This file does NOT modify any first-atlas file. It reads atlas-software.jsonl,
+This file does NOT modify any first-atlas file. It reads atlas-general.jsonl,
 reuses load_env() from score_outputs.py, score_output_full() from cloud_judge.py,
 and endpoint / auth / grade helpers from config.py.
 
@@ -69,7 +69,7 @@ from score_outputs import load_env
 PIPELINE_VERSION = "pipeline-6-optimize-lift-v1.0"
 
 # First atlas (input — read only) and this pipeline's output.
-FIRST_ATLAS_ABS = (ROOT / "scripts/pipeline-6/outputs/atlas-software.jsonl").resolve()
+FIRST_ATLAS_ABS = (ROOT / "scripts/pipeline-6/outputs/atlas-general.jsonl").resolve()
 OUTPUT_ABS = (ROOT / "scripts/pipeline-6/outputs/atlas-optimize-lift.jsonl").resolve()
 
 # -----------------------------------------------------------------------------
@@ -183,7 +183,7 @@ def _lift(optimized_total, original_total):
 def process_prompt(fa_row: dict) -> dict:
     """Run the optimize-lift pipeline for one first-atlas row -> one atlas row.
 
-    `fa_row` is a first-atlas (atlas-software.jsonl) row. Its prompt_score,
+    `fa_row` is a first-atlas (atlas-general.jsonl) row. Its prompt_score,
     output_text, and output_score are reused verbatim as the ORIGINAL side.
     Callers must pre-filter rows whose output_score is null.
     """
@@ -251,7 +251,7 @@ def process_prompt(fa_row: dict) -> dict:
 # First-atlas reading + resume support.
 # -----------------------------------------------------------------------------
 def load_first_atlas(path: Path = FIRST_ATLAS_ABS) -> dict[str, dict]:
-    """Read atlas-software.jsonl into a dict keyed by prompt_id."""
+    """Read atlas-general.jsonl into a dict keyed by prompt_id."""
     if not path.exists():
         raise SystemExit(
             f"first atlas not found: {path}\n"

@@ -8,7 +8,7 @@ ORIGINAL output score against an OPTIMIZED output score — but the two sides
 were graded by different judges:
 
   - The ORIGINAL output score was carried over from the first atlas
-    (atlas-software.jsonl), where outputs were scored by Pipeline 6's hybrid
+    (atlas-general.jsonl), where outputs were scored by Pipeline 6's hybrid
     judge path (cloud_judge calling Haiku 4.5 per-dimension via the Anthropic
     SDK directly).
   - The OPTIMIZED output score came from /api/score-output, which runs
