@@ -46,7 +46,7 @@ from config import (
     OUTPUT_DIMENSION_DEFINITIONS,
     REQUEST_TIMEOUT_SEC,
     RETRY_BASE_SEC,
-    internal_bypass_headers,
+    api_key_headers,
 )
 
 # Haiku 4.5 pricing per million tokens (USD) — SOP_PROMPT_CACHING table.
@@ -259,9 +259,11 @@ def score_output_full(prompt: str, output: str, vertical: str) -> dict:
         "vertical": vertical,
     }).encode("utf-8")
 
+    # /api/score-output does NOT honor the middleware bypass header — it
+    # validates an Authorization: Bearer <PQS_*> key against pqs_api_keys.
     headers = {
         "Content-Type": "application/json",
-        **internal_bypass_headers(),
+        **api_key_headers(),
     }
 
     last_exc: Exception | None = None

@@ -66,13 +66,27 @@ CORRELATION_REPORT_PATH = ROOT / "findings" / "output-correlation.md"
 
 # -----------------------------------------------------------------------------
 # Endpoints — PQS scoring services. All overridable via env.
-# Internal calls send a single x-pqs-internal-bypass: <PQS_INTERNAL_BYPASS_KEY>
-# header. Production middleware.js validates this key against the
-# PQS_PARTNER_BYPASS_KEYS partner-key registry (with PQS_INTERNAL_BYPASS_KEY as
-# the legacy single-key fallback); on a match it sets x-pqs-bypass-verified=1
-# and the route handler reads THAT to skip the x402 paywall on /api/score and
-# admit the internal-only /api/score-output endpoint. Pipeline 6 only sends the
-# bypass key — it never sets the verified header itself; middleware does.
+#
+# Pipeline 6 talks to two endpoints with TWO DIFFERENT auth contracts:
+#
+#   /api/score        (pre-flight prompt scoring) — middleware-bypass auth.
+#       Send a single x-pqs-internal-bypass: <PQS_INTERNAL_BYPASS_KEY> header.
+#       Production middleware.js validates this key against the
+#       PQS_PARTNER_BYPASS_KEYS partner-key registry (with PQS_INTERNAL_BYPASS_KEY
+#       as the legacy single-key fallback); on a match it sets
+#       x-pqs-bypass-verified=1 and the route handler reads THAT to skip the
+#       x402 paywall. Pipeline 6 only sends the bypass key — it never sets the
+#       verified header itself; middleware does.
+#
+#   /api/score-output (post-flight output scoring) — Bearer API key auth.
+#       This endpoint does NOT honor the middleware bypass. It validates an
+#       Authorization: Bearer <PQS_*> API key against the pqs_api_keys Supabase
+#       table (route comment: "No x402 payment path — this endpoint is
+#       internal-use"; handler enforces hasApiKey(req)). Send the PQS_API_KEY
+#       as an Authorization: Bearer header — the bypass header returns 401 here.
+#
+# See internal_bypass_headers() (/api/score) and api_key_headers()
+# (/api/score-output) below, and scripts/pipeline-6/README.md.
 # -----------------------------------------------------------------------------
 ENDPOINT_PROMPT_SCORE = os.getenv("PQS_PROMPT_SCORE_URL", "https://pqs.onchainintel.net/api/score")
 ENDPOINT_OUTPUT_SCORE = os.getenv("PQS_OUTPUT_SCORE_URL", "https://pqs.onchainintel.net/api/score-output")
@@ -233,9 +247,31 @@ def internal_bypass_key() -> str:
 def internal_bypass_headers() -> dict:
     """The x-pqs-internal-bypass request header carrying the internal bypass
     key. Middleware validates the key and, on a match, sets x-pqs-bypass-verified
-    so the route handler skips x402 — Pipeline 6 sends only the bypass key."""
+    so the route handler skips x402 — Pipeline 6 sends only the bypass key.
+    Use on /api/score calls only; /api/score-output requires Bearer auth."""
     tok = os.environ.get("PQS_INTERNAL_BYPASS_KEY")
     return {"x-pqs-internal-bypass": tok} if tok else {}
+
+
+def api_key() -> str:
+    """The PQS API key. Sent as Authorization: Bearer <key> to /api/score-output
+    which validates against the pqs_api_keys Supabase table."""
+    tok = os.environ.get("PQS_API_KEY")
+    if not tok:
+        raise RuntimeError(
+            "PQS_API_KEY not set — required for /api/score-output Bearer auth. "
+            "Unlike /api/score, the output-scoring endpoint does not honor "
+            "middleware bypass; it validates Authorization: Bearer <PQS_*> "
+            "against pqs_api_keys. See scripts/pipeline-6/README.md."
+        )
+    return tok
+
+
+def api_key_headers() -> dict:
+    """The Authorization: Bearer header carrying the PQS API key. Used on
+    /api/score-output calls (which require Bearer auth, not bypass header)."""
+    tok = os.environ.get("PQS_API_KEY")
+    return {"Authorization": f"Bearer {tok}"} if tok else {}
 
 
 if __name__ == "__main__":

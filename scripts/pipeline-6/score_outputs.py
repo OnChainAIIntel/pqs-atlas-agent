@@ -53,7 +53,9 @@ from local_judge import score_dimension_local
 
 # -----------------------------------------------------------------------------
 # Env loading — load a repo-root .env.atlas if present, then leave the rest of
-# the environment as-is. Required keys: ANTHROPIC_API_KEY, PQS_INTERNAL_BYPASS_KEY.
+# the environment as-is. Required keys: ANTHROPIC_API_KEY, PQS_INTERNAL_BYPASS_KEY
+# (x-pqs-internal-bypass auth for /api/score), and PQS_API_KEY (Authorization:
+# Bearer auth for /api/score-output — that endpoint does not honor the bypass).
 # -----------------------------------------------------------------------------
 def load_env() -> None:
     env_path = ROOT / ".env.atlas"
@@ -67,7 +69,8 @@ def load_env() -> None:
             if k and not os.environ.get(k):
                 os.environ[k] = v
 
-    missing = [k for k in ("ANTHROPIC_API_KEY", "PQS_INTERNAL_BYPASS_KEY")
+    missing = [k for k in ("ANTHROPIC_API_KEY", "PQS_INTERNAL_BYPASS_KEY",
+                           "PQS_API_KEY")
                if not os.environ.get(k)]
     if missing:
         raise SystemExit(

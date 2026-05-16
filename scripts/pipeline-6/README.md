@@ -38,27 +38,37 @@ headline correlation number.
    depend on this endpoint (per-dimension judge attribution comes from the
    direct judge calls).
 2. **`PQS_INTERNAL_BYPASS_KEY`** set — the internal bypass key sent as the
-   single `x-pqs-internal-bypass` header. Production `middleware.js` validates
-   it against the `PQS_PARTNER_BYPASS_KEYS` partner-key registry (with
-   `PQS_INTERNAL_BYPASS_KEY` as the legacy single-key fallback); on a match it
-   sets `x-pqs-bypass-verified`, which the route handler reads to skip the x402
-   paywall on `/api/score` and admit the internal `/api/score-output` endpoint.
-3. **`ANTHROPIC_API_KEY`** set — for the Haiku 4.5 generator and cloud judge.
-4. **Ollama running on CRYPTOMINER** at `OLLAMA_HOST` (default
+   single `x-pqs-internal-bypass` header on `/api/score` calls only.
+   Production `middleware.js` validates it against the `PQS_PARTNER_BYPASS_KEYS`
+   partner-key registry (with `PQS_INTERNAL_BYPASS_KEY` as the legacy
+   single-key fallback); on a match it sets `x-pqs-bypass-verified`, which the
+   route handler reads to skip the x402 paywall on `/api/score`.
+3. **`PQS_API_KEY`** set — a `PQS_*` API key sent as an `Authorization: Bearer`
+   header on `/api/score-output` calls. That endpoint does **not** honor the
+   middleware bypass; it validates the Bearer key against the `pqs_api_keys`
+   Supabase table (route comment: "No x402 payment path — this endpoint is
+   internal-use"). The bypass header returns HTTP 401 here.
+4. **`ANTHROPIC_API_KEY`** set — for the Haiku 4.5 generator and cloud judge.
+5. **Ollama running on CRYPTOMINER** at `OLLAMA_HOST` (default
    `http://192.168.1.205:11434`) with `gemma2:9b` pulled (`ollama pull gemma2:9b`).
-5. **Python deps:** `pip install -r scripts/pipeline-6/requirements.txt`
+6. **Python deps:** `pip install -r scripts/pipeline-6/requirements.txt`
    (`anthropic`, `scikit-learn`, `scipy`).
 
 Set environment variables in a repo-root `.env.atlas` file or export them
-directly. `PQS_INTERNAL_BYPASS_KEY` is sent as the `x-pqs-internal-bypass`
-header; `middleware.js` validates it against the partner-key registry and, on a
-match, admits the request past the x402 paywall.
+directly. Pipeline 6 uses **two auth paths** for the two scoring endpoints:
+`/api/score` (pre-flight prompt scoring) takes the middleware-bypass path —
+`PQS_INTERNAL_BYPASS_KEY` sent as `x-pqs-internal-bypass`, which `middleware.js`
+validates against the partner-key registry to admit the request past the x402
+paywall. `/api/score-output` (post-flight output scoring) takes the Bearer
+path — `PQS_API_KEY` sent as `Authorization: Bearer`, validated against the
+`pqs_api_keys` table. The output endpoint does not honor the bypass header.
 
 ### Configurable env vars
 
 | Var | Default | Purpose |
 |---|---|---|
-| `PQS_INTERNAL_BYPASS_KEY` | — (required) | Bypass key sent as `x-pqs-internal-bypass` header; middleware validates against `PQS_PARTNER_BYPASS_KEYS` registry or legacy `PQS_INTERNAL_BYPASS_KEY` env var |
+| `PQS_INTERNAL_BYPASS_KEY` | — (required) | Bypass key sent as `x-pqs-internal-bypass` header on `/api/score`; middleware validates against `PQS_PARTNER_BYPASS_KEYS` registry or legacy `PQS_INTERNAL_BYPASS_KEY` env var |
+| `PQS_API_KEY` | — (required) | API key sent as `Authorization: Bearer` header to `/api/score-output`; validated against `pqs_api_keys` Supabase table |
 | `ANTHROPIC_API_KEY` | — (required) | Haiku generator + cloud judge |
 | `PQS_PROMPT_SCORE_URL` | `https://pqs.onchainintel.net/api/score` | Pre-flight prompt scoring |
 | `PQS_OUTPUT_SCORE_URL` | `https://pqs.onchainintel.net/api/score-output` | Full output scoring (observability) |
