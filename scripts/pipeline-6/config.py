@@ -121,10 +121,10 @@ KAPPA_PASS_THRESHOLD = 0.70     # Cohen's weighted kappa floor for "local" assig
 # -----------------------------------------------------------------------------
 JUDGE_CONFIG = {
     "factual_grounding":     "haiku",
-    "instruction_adherence": "local",
-    "coherence":             "local",
-    "specificity":           "local",
-    "verifiability":         "local",
+    "instruction_adherence": "haiku",
+    "coherence":             "haiku",
+    "specificity":           "haiku",
+    "verifiability":         "haiku",
     "hallucination_risk":    "haiku",
 }
 
