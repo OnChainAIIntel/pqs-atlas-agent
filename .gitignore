@@ -58,3 +58,10 @@ data/atlas-failures.jsonl
 !data/pipeline-5-anchors.jsonl
 !data/pipeline-5-rater-outputs.jsonl
 !data/pipeline-5-kappa-results.json
+
+# Pipeline 6 — atlas env + generated output. The outputs/ directory marker is
+# tracked; generated atlas/kappa files are not (final datasets get committed
+# separately once reviewed — force-add them).
+.env.atlas
+scripts/pipeline-6/outputs/*
+!scripts/pipeline-6/outputs/.gitkeep
