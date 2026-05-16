@@ -65,3 +65,5 @@ data/atlas-failures.jsonl
 .env.atlas
 scripts/pipeline-6/outputs/*
 !scripts/pipeline-6/outputs/.gitkeep
+.logs/
+.openclaw-state.json
