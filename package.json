@@ -6,13 +6,24 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "generate-atlas-row": "tsx scripts/generate-atlas-row.ts",
-    "generate-atlas-batch": "tsx scripts/generate-atlas-batch.ts"
+    "generate-atlas-batch": "tsx scripts/generate-atlas-batch.ts",
+    "atlas-agent": "tsx bin/atlas-agent.ts",
+    "serve": "tsx bin/atlas-agent.ts serve",
+    "buy": "tsx bin/atlas-agent.ts buy",
+    "status": "tsx bin/atlas-agent.ts status",
+    "doctor": "tsx bin/atlas-agent.ts doctor",
+    "test": "tsx scripts/test-grade-gate.ts"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@virtuals-protocol/acp-node": "^0.3.0-beta.40",
+    "dotenv": "^17.4.2",
+    "viem": "^2.48.4"
+  },
   "devDependencies": {
-    "typescript": "^5.3.0",
+    "@types/node": "^20.10.0",
     "tsx": "^4.7.0",
-    "@types/node": "^20.10.0"
+    "typescript": "^5.3.0"
   }
 }

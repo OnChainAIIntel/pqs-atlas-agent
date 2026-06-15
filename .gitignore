@@ -23,6 +23,10 @@ __pycache__/
 # Logs
 *.log
 logs/
+.logs/
+
+# openclaw-acp runtime state (wallet, agent name, tx artifacts)
+.openclaw-state.json
 
 # Editor / OS
 .DS_Store
